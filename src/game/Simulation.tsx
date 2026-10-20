@@ -386,7 +386,15 @@ function applyForm(f: 'split' | 'merging' | 'joined' | 'splitting') {
     fx('particles', { n: 'merge', p: { x: G.formAt.x, y: G.formAt.y + 1.5, z: G.formAt.z } }, false)
   }
   if (f === 'joined') {
-    if (!isHost()) G.big.active = true
+    if (!isHost()) {
+      // Guest: appear on the merge spot right away (snapshots refine it).
+      const B = G.big
+      B.active = true
+      B.pos.set(G.formAt.x, G.formAt.y + BIG.feet + 0.05, G.formAt.z)
+      B.yaw = G.formYaw
+      B.body?.setEnabled(true)
+      B.body?.setTranslation({ x: B.pos.x, y: B.pos.y, z: B.pos.z }, true)
+    }
     fx('shake', { a: 0.4 }, false)
     toast('¡Cuerpo unido! Cada uno mueve su pierna y su brazo.', 'good')
   }

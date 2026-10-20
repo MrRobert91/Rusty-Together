@@ -64,6 +64,8 @@ export function CameraRig() {
       s.init = true
       C.yaw = G.checkpoint ? G.checkpoint.yaw + Math.PI : C.yaw
     }
+    // Teleports / respawns / form changes: cut instead of sweeping across the level.
+    if (s.target.distanceTo(tmp) > 9) s.target.copy(tmp)
     s.target.x = damp(s.target.x, tmp.x, 12, dt)
     s.target.z = damp(s.target.z, tmp.z, 12, dt)
     s.target.y = damp(s.target.y, tmp.y, joined ? 4 : 7, dt)

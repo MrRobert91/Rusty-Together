@@ -190,6 +190,12 @@ export function receiveWorld(s: WorldSnap) {
   if (s.big) {
     const d = s.big
     const B = G.big
+    if (d.a && !B.active && B.body) {
+      // First snapshot of an active body: place it, don't let it fly in.
+      bigBuf.length = 0
+      B.body.setTranslation({ x: d.p[0], y: d.p[1], z: d.p[2] }, true)
+      B.pos.set(d.p[0], d.p[1], d.p[2])
+    }
     B.active = !!d.a
     bigBuf.push({ t: s.t, p: new Vector3(d.p[0], d.p[1], d.p[2]), v: new Vector3(d.v[0], d.v[1], d.v[2]), y: d.y })
     while (bigBuf.length > 20) bigBuf.shift()

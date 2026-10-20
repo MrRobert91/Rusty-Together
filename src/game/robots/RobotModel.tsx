@@ -138,7 +138,8 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
     const stretch = tj < 0.35 ? Math.sin((tj / 0.35) * Math.PI) * 0.14 : 0
     const sy = 1 - squash + stretch - s.crouch * 0.12
     const sxz = 1 + squash * 0.6 - stretch * 0.5 + s.crouch * 0.06
-    r.scale.set(sxz, sy, sxz)
+    const S = big ? 2.2 : 1
+    r.scale.set(S * sxz, S * sy, S * sxz)
 
     // Lean into acceleration (local space).
     const fwdAcc = s.accel.x * Math.sin(s.yaw) + s.accel.z * Math.cos(s.yaw)

@@ -117,6 +117,7 @@ export class OnlineSession implements Session {
   private em = new Emitter()
   private offset = 0
   private offsetReady = false
+  private samples: { rtt: number; off: number }[] = []
   private unsub: Array<() => void> = []
   private pingTimer = 0
 
@@ -144,14 +145,20 @@ export class OnlineSession implements Session {
   private onRelay(m: Relay) {
     if (m.t === '_ping') { this.send('_pong', { t0: m.d, h: performance.now() / 1000 }); return }
     if (m.t === '_hping') { this.send('_hpong', m.d); return }
-    if (m.t === '_hpong') { this.rtt = this.rtt * 0.7 + ((performance.now() - (m.d as number)) / 1000) * 0.3; return }
+    if (m.t === '_hpong') { const r = (performance.now() - (m.d as number)) / 1000; this.rtt = Math.min(r, this.rtt * 0.7 + r * 0.3); return }
     if (m.t === '_pong') {
+      // NTP-style: the sample with the lowest round trip gives the most
+      // trustworthy offset (a blocked main thread inflates the others).
       const d = m.d as { t0: number; h: number }
       const now = performance.now()
       const rtt = (now - d.t0) / 1000
-      this.rtt = this.offsetReady ? this.rtt * 0.7 + rtt * 0.3 : rtt
       const off = d.h + rtt / 2 - now / 1000
-      this.offset = this.offsetReady ? this.offset * 0.8 + off * 0.2 : off
+      this.samples.push({ rtt, off })
+      if (this.samples.length > 10) this.samples.shift()
+      const best = this.samples.reduce((a, b) => (b.rtt < a.rtt ? b : a))
+      const sorted = this.samples.map((x) => x.rtt).sort((a, b) => a - b)
+      this.rtt = sorted[Math.floor(sorted.length / 2)]
+      this.offset = this.offsetReady ? this.offset + (best.off - this.offset) * 0.3 : best.off
       this.offsetReady = true
       return
     }
