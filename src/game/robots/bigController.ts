@@ -13,14 +13,17 @@ export interface PilotFrame {
   brake: boolean
   couple: boolean
   grab: boolean
+  /** Hook held: keeps the arm latched and reels it in. */
   reel: boolean
   /** Host-clock timestamps of presses that happened since the last step. */
   jumps: number[]
   xs: number[]
+  /** Host-clock timestamps of hook releases (slingshot timing). */
+  xr: number[]
   emote: number
 }
 
-export const newPilotFrame = (): PilotFrame => ({ move: new Vector3(), aim: new Vector3(0, 0, -1), brake: false, couple: false, grab: false, reel: false, jumps: [], xs: [], emote: 0 })
+export const newPilotFrame = (): PilotFrame => ({ move: new Vector3(), aim: new Vector3(0, 0, -1), brake: false, couple: false, grab: false, reel: false, jumps: [], xs: [], xr: [], emote: 0 })
 
 const gh = newGroundHit()
 const v = new Vector3()
@@ -32,8 +35,12 @@ const tmp2 = new Vector3()
 const avg = new Vector3()
 const right = new Vector3()
 
-interface BigLocal { lastGround: number; prevVy: number; hopOwner: number; slingNag: number; coupleT: [number, number] }
-const bl: BigLocal = { lastGround: 0, prevVy: 0, hopOwner: -1, slingNag: 0, coupleT: [0, 0] }
+interface BigLocal {
+  lastGround: number; prevVy: number; hopOwner: number; slingNag: number; coupleT: [number, number]
+  /** When each pilot let go of the hook while latched (-9 = still holding). */
+  relT: [number, number]
+}
+const bl: BigLocal = { lastGround: 0, prevVy: 0, hopOwner: -1, slingNag: 0, coupleT: [0, 0], relT: [-9, -9] }
 
 export const window_ = (base: number) => (settings().assist ? Math.max(base, BIG.assistWindow) : base)
 
@@ -290,49 +297,26 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
     }
     if (arm.grip && !G.anchors.get(arm.grip)?.enabled) arm.grip = null
 
-    for (const xt of pf.xs) {
+    for (const _xt of pf.xs) {
       if (c.state === 'idle' && !arm.grip) {
         const a = pickBigTarget(world, B, i, pf.aim)
         c.state = 'flying'
         c.t = t
         c.tip.copy(tmp2)
         c.charge = 0
+        bl.relT[i] = -9
         if (a) { c.anchorId = a.id; c.target.copy(a.pos); c.hit = true }
         else { c.anchorId = null; c.target.copy(tmp2).addScaledVector(pf.aim, BIG.armRange * 0.8); c.hit = false }
         fx('sfx', { n: 'cableFire', p: tmp2 })
-      } else if (c.state === 'attached') {
-        const a = c.anchorId ? G.anchors.get(c.anchorId) : null
-        const otherC = B.arms[1 - i].cable
-        const otherA = otherC.anchorId ? G.anchors.get(otherC.anchorId) : null
-        const slingReady = a?.sling && otherA?.sling && a.sling.group === otherA.sling.group && otherC.state === 'attached' && B.tension > 0.95
-        if (slingReady) {
-          B.xPress[i] = xt
-          if (Math.abs(xt - B.xPress[1 - i]) <= CW) {
-            // Double confirmation inside the window: fire the slingshot.
-            const to = a!.sling!.to
-            v.copy(ballistic(B.pos, tmp.copy(to).setY(to.y + 1.2), a!.sling!.time, GRAVITY))
-            for (const arm2 of B.arms) { arm2.cable.state = 'retract'; arm2.cable.anchorId = null }
-            B.launchedT = a!.sling!.time
-            B.jumpT = t
-            B.grounded = false
-            B.tension = 0
-            G.stats.jointJumps++
-            fx('sfx', { n: 'spring', p: B.pos, v: 1.4 })
-            fx('sfx', { n: 'whoosh', p: B.pos })
-            fx('particles', { n: 'merge', p: B.pos })
-            fx('shake', { a: 0.5 })
-            fx('sling', {})
-            return
-          }
-          fx('sfx', { n: i === 0 ? 'beepCyan' : 'beepAmber', p: B.pos })
-          if (t - bl.slingNag > 2) { bl.slingNag = t; fx('hint', { text: 'Cable cargado: ¡falta la confirmación de tu compañero!' }) }
-        } else {
-          c.state = 'retract'
-          c.anchorId = null
-          fx('sfx', { n: 'release', p: tmp2 })
-        }
       }
     }
+    // Release timestamps arrive with the host clock, so the slingshot window
+    // is judged on when each pilot actually let go, not on packet arrival.
+    for (const rt of pf.xr) if (c.state === 'attached' || c.state === 'flying') bl.relT[i] = rt
+    pf.xr.length = 0
+    const holding = pf.reel || pf.xs.length > 0
+    if (holding) bl.relT[i] = -9
+    else if (bl.relT[i] < 0 && c.state === 'attached') bl.relT[i] = t
     pf.xs.length = 0
 
     if (c.state === 'flying') {
@@ -344,6 +328,19 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
         c.tip.copy(c.target)
         const a = c.anchorId ? G.anchors.get(c.anchorId) : null
         if (!c.hit || !a || !a.enabled) { c.state = 'retract'; continue }
+        if (!holding) {
+          // Tapped: a short tug toward the anchor, then the arm returns.
+          tmp.copy(a.pos).sub(B.pos).normalize()
+          v.addScaledVector(tmp, 5)
+          v.y = Math.max(v.y, 0) + 2.5
+          B.launchedT = 0.3
+          B.jumpT = t
+          B.grounded = false
+          c.state = 'retract'
+          c.anchorId = null
+          fx('sfx', { n: 'whoosh', p: B.pos })
+          continue
+        }
         c.state = 'attached'
         c.len = Math.max(BIG.minRope, B.pos.distanceTo(a.pos))
         G.stats.rings++
@@ -366,8 +363,32 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
       if (!a || !a.enabled) { c.state = 'retract'; c.anchorId = null; continue }
       c.tip.copy(a.pos)
       c.target.copy(a.pos)
-      c.reeling = pf.reel
-      if (pf.reel && c.len > BIG.minRope) {
+      if (!holding) {
+        // Let go of the hook. Both arms on a charged slingshot wait for the
+        // partner's release: two releases inside the window fire it.
+        c.reeling = false
+        const otherC = B.arms[1 - i].cable
+        const otherA = otherC.anchorId ? G.anchors.get(otherC.anchorId) : null
+        const slingReady = !!a.sling && !!otherA?.sling && a.sling.group === otherA.sling.group && otherC.state === 'attached' && B.tension > 0.95
+        if (slingReady) {
+          const other = bl.relT[1 - i]
+          if (other >= 0 && Math.abs(bl.relT[i] - other) <= CW) {
+            fireSling(B, a, t)
+            return
+          }
+          // Inside the window: stay latched (tension held) for the partner.
+          if (t - bl.relT[i] > CW && t - bl.slingNag > 2) { bl.slingNag = t; fx('hint', { text: '¡Soltad el gancho a la vez para disparar el tirachinas!' }) }
+        }
+        if (!slingReady || t - bl.relT[i] > CW) {
+          c.state = 'retract'
+          c.anchorId = null
+          bl.relT[i] = -9
+          if (!B.grounded) { v.y = Math.max(v.y, 0) + 2; B.launchedT = Math.max(B.launchedT, 0.2) }
+          fx('sfx', { n: 'release', p: tmp2 })
+          continue
+        }
+      } else c.reeling = true
+      if (c.reeling && c.len > BIG.minRope) {
         c.len = Math.max(BIG.minRope, c.len - BIG.reelSpeed * dt)
         if (Math.floor(t * 10) !== Math.floor((t - dt) * 10)) fx('sfx', { n: 'cableReel', p: a.pos }, false)
       }
@@ -403,6 +424,23 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
   if (!B.grounded && B.arms.some((a) => a.cable.state === 'attached')) v.multiplyScalar(1 - 0.06 * dt)
 }
 
+function fireSling(B: Combined, a: Anchor, t: number) {
+  const to = a.sling!.to
+  v.copy(ballistic(B.pos, tmp.copy(to).setY(to.y + 1.2), a.sling!.time, GRAVITY))
+  for (const arm2 of B.arms) { arm2.cable.state = 'retract'; arm2.cable.anchorId = null; arm2.cable.reeling = false }
+  bl.relT = [-9, -9]
+  B.launchedT = a.sling!.time
+  B.jumpT = t
+  B.grounded = false
+  B.tension = 0
+  G.stats.jointJumps++
+  fx('sfx', { n: 'spring', p: B.pos, v: 1.4 })
+  fx('sfx', { n: 'whoosh', p: B.pos })
+  fx('particles', { n: 'merge', p: B.pos })
+  fx('shake', { a: 0.5 })
+  fx('sling', {})
+}
+
 /** Couple-out consent: both pilots hold Y on the ground. */
 export function bigWantsSplit(B: Combined, P: [PilotFrame, PilotFrame], dt: number) {
   for (let i = 0; i < 2; i++) bl.coupleT[i] = P[i].couple && B.grounded ? bl.coupleT[i] + dt : 0
@@ -414,6 +452,7 @@ export function resetBigLocals() {
   bl.prevVy = 0
   bl.hopOwner = -1
   bl.coupleT = [0, 0]
+  bl.relT = [-9, -9]
 }
 
 export function hintToast(text: string) { toast(text, 'warn') }

@@ -470,38 +470,39 @@ function finish(m: Mini, vel: Vector3, dt: number, move: Vector3) {
 
 /* ------------------------------------------------------------ Cable */
 
+/**
+ * One-button hook, Spider-style: press to fire, keep holding to stay latched
+ * and reel in (at full reel the spring charges), release to let go. Releasing
+ * with charge fires the spring; releasing mid-swing keeps the arc's momentum.
+ * A quick tap that lands after the button is up becomes a short yank.
+ */
 function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: Mini) {
   const c = m.cable
   const t = G.time
+  const hold = !!inp.held.primary || !!inp.pressed.primary
   handPos(m, tmp2)
 
-  if (inp.pressed.primary && !m.carrying && m.hangOn < 0) {
-    if (c.state === 'attached') {
-      detach(m, inp.held.jump ? 3.5 : 1.5)
-      return
+  if (inp.pressed.primary && !m.carrying && m.hangOn < 0 && c.state === 'idle') {
+    const aim = inp.aim
+    const pk = pickMiniTarget(world, m, aim, partner)
+    c.tip.copy(tmp2)
+    c.state = 'flying'
+    c.t = t
+    c.charge = 0
+    if (pk.kind === 'anchor') {
+      c.anchorId = pk.anchor!.id
+      c.target.copy(pk.anchor!.pos)
+      c.hit = true
+    } else if (pk.kind === 'robot') {
+      c.anchorId = `robot:${partner.slot}`
+      c.target.copy(partner.pos)
+      c.hit = true
+    } else {
+      c.anchorId = null
+      c.target.copy(tmp2).addScaledVector(aim, MINI.cableRange)
+      c.hit = false
     }
-    if (c.state === 'idle') {
-      const aim = inp.aim
-      const pk = pickMiniTarget(world, m, aim, partner)
-      c.tip.copy(tmp2)
-      c.state = 'flying'
-      c.t = t
-      c.charge = 0
-      if (pk.kind === 'anchor') {
-        c.anchorId = pk.anchor!.id
-        c.target.copy(pk.anchor!.pos)
-        c.hit = true
-      } else if (pk.kind === 'robot') {
-        c.anchorId = `robot:${partner.slot}`
-        c.target.copy(partner.pos)
-        c.hit = true
-      } else {
-        c.anchorId = null
-        c.target.copy(tmp2).addScaledVector(aim, MINI.cableRange)
-        c.hit = false
-      }
-      fx('sfx', { n: 'cableFire', p: m.pos })
-    }
+    fx('sfx', { n: 'cableFire', p: m.pos })
   }
 
   if (c.state === 'flying') {
@@ -533,10 +534,24 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
         c.state = 'retract'
         return
       }
+      if (a.kind === 'glove') {
+        c.state = 'attached'
+        c.len = Math.max(MINI.minRope, m.pos.distanceTo(a.pos))
+        m.hangOn = partner.slot
+        m.hangT = 0
+        return
+      }
+      if (!hold) {
+        // Tapped: yank toward the anchor and let go straight away.
+        yank(m, a.pos)
+        c.state = 'retract'
+        c.anchorId = null
+        G.stats.rings++
+        return
+      }
       c.state = 'attached'
       c.len = Math.max(MINI.minRope, m.pos.distanceTo(a.pos))
       G.stats.rings++
-      if (a.kind === 'glove') { m.hangOn = partner.slot; m.hangT = 0 }
       if (m.kind === 'local') rumble(0.2, 0.4, 60)
     } else {
       c.tip.addScaledVector(tmp, step / d)
@@ -565,38 +580,23 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
     }
     if (inp.pressed.jump && !m.grounded) { detach(m, 5.5); return }
 
-    // Reel / charge.
-    c.reeling = !!inp.held.secondary
-    if (c.reeling) {
-      if (c.len > MINI.minRope + 0.01) {
-        c.len = Math.max(MINI.minRope, c.len - MINI.reelSpeed * dt)
-        if (Math.floor(t * 12) !== Math.floor((t - dt) * 12)) fx('sfx', { n: 'cableReel', p: m.pos }, false)
-      } else {
-        const before = c.charge
-        c.charge = Math.min(1, c.charge + dt / MINI.chargeTime)
-        if (before === 0) fx('sfx', { n: 'charge', p: m.pos })
-        if (c.charge >= 1 && before < 1 && m.kind === 'local') rumble(0.5, 0.5, 120)
-      }
-    } else if (inp.released.secondary && c.charge > 0.12) {
-      // Spring launch: predictable arc up-and-over the anchor, toward the stick.
-      tmp.copy(a.pos).sub(m.pos).normalize()
-      facing(m, fwd)
-      if (inp.move.lengthSq() > 0.05) fwd.copy(inp.move).normalize()
-      target.copy(tmp).multiplyScalar(0.35).addScaledVector(UP, 1).addScaledVector(fwd, 0.6).normalize()
-      const speed = MINI.launchMin + (MINI.launchMax - MINI.launchMin) * c.charge
-      v.copy(target).multiplyScalar(speed)
-      c.state = 'retract'
-      c.anchorId = null
-      c.charge = 0
-      m.launchedT = 0.55
-      m.jumpT = t
-      m.grounded = false
-      fx('sfx', { n: 'spring', p: m.pos })
-      fx('particles', { n: 'burst', p: m.pos, c: m.slot === 0 ? '#5ef0ff' : '#ffb347' })
-      if (m.kind === 'local') rumble(0.6, 0.6, 140)
+    if (!hold) {
+      c.reeling = false
+      if (c.charge > 0.12) { springLaunch(m, a, inp); return }
+      detach(m, m.grounded ? 0 : MINI.releaseBoost)
       return
-    } else {
-      c.charge = Math.max(0, c.charge - dt * 2)
+    }
+
+    // Holding: reel in, and at full reel wind the spring.
+    c.reeling = true
+    if (c.len > MINI.minRope + 0.01) {
+      c.len = Math.max(MINI.minRope, c.len - MINI.reelSpeed * dt)
+      if (Math.floor(t * 12) !== Math.floor((t - dt) * 12)) fx('sfx', { n: 'cableReel', p: m.pos }, false)
+    } else if (a.kind === 'ring') {
+      const before = c.charge
+      c.charge = Math.min(1, c.charge + dt / MINI.chargeTime)
+      if (before === 0) fx('sfx', { n: 'charge', p: m.pos })
+      if (c.charge >= 1 && before < 1 && m.kind === 'local') rumble(0.5, 0.5, 120)
     }
 
     // Rope constraint (inextensible, slack allowed).
@@ -616,11 +616,48 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
   }
 }
 
+/** Spring launch: predictable arc up-and-over the anchor, toward the stick. */
+function springLaunch(m: Mini, a: Anchor, inp: StepInput) {
+  const c = m.cable
+  tmp.copy(a.pos).sub(m.pos).normalize()
+  facing(m, fwd)
+  if (inp.move.lengthSq() > 0.05) fwd.copy(inp.move).normalize()
+  target.copy(tmp).multiplyScalar(0.35).addScaledVector(UP, 1).addScaledVector(fwd, 0.6).normalize()
+  const speed = MINI.launchMin + (MINI.launchMax - MINI.launchMin) * c.charge
+  v.copy(target).multiplyScalar(speed)
+  c.state = 'retract'
+  c.anchorId = null
+  c.charge = 0
+  c.reeling = false
+  m.launchedT = 0.55
+  m.jumpT = G.time
+  m.grounded = false
+  fx('sfx', { n: 'spring', p: m.pos })
+  fx('particles', { n: 'burst', p: m.pos, c: m.slot === 0 ? '#5ef0ff' : '#ffb347' })
+  if (m.kind === 'local') rumble(0.6, 0.6, 140)
+}
+
+/** Tap on an anchor: a short pull toward it with a little lift. */
+function yank(m: Mini, to: Vector3) {
+  tmp.copy(to).sub(m.pos)
+  const d = tmp.length()
+  if (d < 1e-3) return
+  tmp.divideScalar(d)
+  const k = Math.min(1, d / MINI.cableRange)
+  v.addScaledVector(tmp, MINI.yankSpeed * k)
+  v.y = Math.max(v.y, 0) + 3.2 * k
+  m.launchedT = 0.3
+  m.jumpT = G.time
+  m.grounded = false
+  fx('sfx', { n: 'whoosh', p: m.pos })
+}
+
 function detach(m: Mini, upBoost: number) {
   const c = m.cable
   c.state = 'retract'
   c.anchorId = null
   c.charge = 0
+  c.reeling = false
   if (!m.grounded && upBoost > 0) {
     // Swing release keeps (and slightly boosts) the arc's momentum.
     v.x *= 1.2

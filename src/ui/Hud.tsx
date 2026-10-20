@@ -83,7 +83,7 @@ export function Hud() {
           <div key={p.id} className="prompt">
             {p.btn && <Key btn={p.btn} device={device} />}
             {p.hold && <span className="hold">mantén</span>}
-            <span>{p.text}</span>
+            <span>{deviceText(p.text, device)}</span>
             {p.progress !== undefined && p.progress > 0 && <div className="prompt-progress"><div style={{ width: `${p.progress * 100}%` }} /></div>}
           </div>
         ))}

@@ -19,9 +19,8 @@ interface BtnDef { b: Btn; label: string; size: number; angle: number; ring: 0 |
 
 const DEFS: BtnDef[] = [
   { b: 'jump', label: 'Saltar', size: 1, angle: 0, ring: 0, tone: 'a' },
-  { b: 'primary', label: 'Puño', size: 0.78, angle: 180, ring: 1, tone: 'x' },
-  { b: 'secondary', label: 'Tensar', size: 0.78, angle: 132, ring: 1, tone: 'lt' },
-  { b: 'grab', label: 'Agarrar', size: 0.78, angle: 84, ring: 1, tone: 'rt' },
+  { b: 'primary', label: 'Gancho', size: 0.86, angle: 168, ring: 1, tone: 'x' },
+  { b: 'grab', label: 'Agarrar', size: 0.78, angle: 100, ring: 1, tone: 'rt' },
   { b: 'brake', label: 'Agachar', size: 0.62, angle: 180, ring: 2, tone: 'b' },
   { b: 'couple', label: 'Unir', size: 0.62, angle: 138, ring: 2, tone: 'y' },
 ]

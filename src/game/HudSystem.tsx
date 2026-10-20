@@ -28,7 +28,7 @@ export function HudSystem() {
       onFx('sfx', (e) => sfx(e.n, e.p, e.v ?? 1)),
       onFx('hint', (e) => toast(e.text, 'warn', 2600)),
       onFx('joint', () => { if (!settings().reduceFlashes) G.cam.shake = Math.min(1, G.cam.shake + 0.2) }),
-      onFx('boost', (e) => { if (e.slot === localSlot()) toast('¡Trampolín! Agáchate (B) para lanzar a tu compañero.', 'info', 2000) }),
+      onFx('boost', (e) => { if (e.slot === localSlot()) toast('¡Trampolín! Agáchate ({brake}) para lanzar a tu compañero.', 'info', 2000) }),
     ]
     return () => offs.forEach((o) => o())
   }, [])
@@ -51,9 +51,8 @@ export function HudSystem() {
         prompt({ id: 'drop', btn: 'grab', text: 'Soltar caja' })
         prompt({ id: 'throw', btn: 'primary', text: 'Lanzar caja' })
       } else if (c.state === 'attached') {
-        if (c.charge > 0.05) prompt({ id: 'launch', btn: 'secondary', text: c.charge >= 1 ? '¡Suelta para salir disparado!' : 'Cargando muelle…', progress: c.charge })
-        else prompt({ id: 'reel', btn: 'secondary', hold: true, text: 'Recoger cable / cargar muelle' })
-        prompt({ id: 'unhook', btn: 'primary', text: 'Soltar' })
+        if (c.charge > 0.05) prompt({ id: 'launch', btn: 'primary', text: c.charge >= 1 ? '¡Suelta para salir disparado!' : 'Cargando muelle… suelta para saltar', progress: c.charge })
+        else prompt({ id: 'reel', btn: 'primary', text: 'Recogiendo… suelta para soltarte' })
         if (!me.grounded) prompt({ id: 'swingjump', btn: 'jump', text: 'Saltar del cable' })
       } else {
         aim.copy(G.cam.fwd)
@@ -62,7 +61,7 @@ export function HudSystem() {
         const pk = c.state === 'idle' ? pickMiniTarget(world as unknown as World, me, aim, partner) : null
         if (pk?.kind === 'anchor' && pk.anchor) {
           pk.anchor.hot[slot] = now
-          const what = pk.anchor.kind === 'glove' ? `Agarrar la mano de ${pn}` : pk.anchor.kind === 'bell' ? 'Golpear campana' : pk.anchor.kind === 'latch' ? 'Enganchar pestillo' : 'Lanzar puño cableado'
+          const what = pk.anchor.kind === 'glove' ? `Agarrar la mano de ${pn}` : pk.anchor.kind === 'bell' ? 'Golpear campana' : pk.anchor.kind === 'latch' ? 'Mantén: enganchar y arrastrar' : 'Mantén: engancharte'
           prompt({ id: 'fire', btn: 'primary', text: what })
         } else if (pk?.kind === 'robot') {
           prompt({ id: 'poke', btn: 'primary', text: `Empujar a ${pn}` })
@@ -81,7 +80,7 @@ export function HudSystem() {
           prompt({ id: 'couple', btn: 'couple', hold: true, text: me.coupleHold > 0 ? `Esperando a ${pn}…` : 'Acoplarse', progress: Math.min(1, me.coupleHold / BIG.coupleHold) })
         }
       }
-      if (G.vars.coupleWait === partner.slot) prompt({ id: 'partnerwants', text: `${pn} quiere acoplarse: id a la placa y mantened Y` })
+      if (G.vars.coupleWait === partner.slot) prompt({ id: 'partnerwants', text: `${pn} quiere acoplarse: id a la placa y mantened {couple}` })
     }
 
     if (G.form === 'joined' && G.big.active) {
@@ -89,14 +88,13 @@ export function HudSystem() {
       const arm = B.arms[slot]
       if (arm.cable.state === 'idle' && !arm.grip) {
         const a = pickBigTarget(world as unknown as World, B, slot, arm.aim)
-        if (a) { a.hot[slot] = now; prompt({ id: 'arm', btn: 'primary', text: 'Lanzar tu brazo' }) }
+        if (a) { a.hot[slot] = now; prompt({ id: 'arm', btn: 'primary', text: 'Mantén: lanzar tu brazo' }) }
       } else if (arm.cable.state === 'attached') {
-        prompt({ id: 'reelbig', btn: 'secondary', hold: true, text: 'Tensar tu cable' })
-        if (B.tension > 0.95) prompt({ id: 'sling', btn: 'primary', text: '¡Lanzaos a la vez!' })
-        else prompt({ id: 'releasebig', btn: 'primary', text: 'Soltar tu brazo' })
+        if (B.tension > 0.95) prompt({ id: 'sling', btn: 'primary', text: '¡Soltad a la vez!' })
+        else prompt({ id: 'reelbig', btn: 'primary', text: 'Tensando… suelta para soltar tu brazo' })
       }
       const w = G.vars.splitWait
-      if (w === partner.slot) prompt({ id: 'splitwait', text: `${pn} quiere separarse: mantén Y` })
+      if (w === partner.slot) prompt({ id: 'splitwait', text: `${pn} quiere separarse: mantén {couple}` })
       if (human.frame.held.couple) prompt({ id: 'splitme', btn: 'couple', hold: true, text: 'Separarse' })
       if (B.dead) prompt({ id: 'respawn', text: 'Reapareciendo…' })
     }

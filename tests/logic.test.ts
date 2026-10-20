@@ -71,3 +71,31 @@ describe('GDD tuning invariants', () => {
     expect(BIG.mergeTime).toBe(1.2)
   })
 })
+
+describe('one-button hook', () => {
+  it('has no separate reel button: the hook is held, grab stays its own verb', async () => {
+    const { BTNS } = await import('../src/core/input')
+    expect(BTNS).not.toContain('secondary' as never)
+    expect(BTNS).toContain('primary')
+    expect(BTNS).toContain('grab')
+  })
+  it('a tap yank and a swing release stay gentler than the charged spring', () => {
+    expect(MINI.yankSpeed).toBeLessThan(MINI.launchMin)
+    expect(MINI.releaseBoost).toBeLessThan(MINI.launchMin)
+    expect(MINI.chargeTime).toBeLessThanOrEqual(1) // GDD: the spring charges in up to 1 s
+  })
+})
+
+describe('button tokens in level text', () => {
+  it('render as the glyph of the device in use', async () => {
+    const { deviceText } = await import('../src/core/input')
+    const s = 'Mantén el gancho ({primary}) y agarra ({grab}).'
+    expect(deviceText(s, 'pad')).toBe('Mantén el gancho (RT) y agarra (LT).')
+    expect(deviceText(s, 'kbm')).toBe('Mantén el gancho (Clic izq.) y agarra (E).')
+    expect(deviceText(s, 'touch')).toContain('Gancho')
+  })
+  it('leave unknown braces alone', async () => {
+    const { deviceText } = await import('../src/core/input')
+    expect(deviceText('{nope} {jump}', 'pad')).toBe('{nope} A')
+  })
+})

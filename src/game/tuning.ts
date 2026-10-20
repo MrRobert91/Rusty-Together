@@ -23,7 +23,9 @@ export const MINI = {
   cableSpeed: 46,
   reelSpeed: 5,
   minRope: 1.1,
-  chargeTime: 1,
+  chargeTime: 0.8,
+  releaseBoost: 2.6, // upward kick when letting go mid-swing
+  yankSpeed: 8.5, // tap the hook: short pull toward the anchor
   launchMin: 9,
   launchMax: 15.5,
   gloveRange: 1.75, // grab partner's offered hand

@@ -49,22 +49,22 @@ type Step = 'move' | 'jump' | 'high' | 'box' | 'swing' | 'spring' | 'meet' | 'bo
 
 const OBJ: Record<Step, string> = {
   move: 'Camina hasta el borde de la pasarela (WASD / stick izquierdo). Mira con el ratón.',
-  jump: 'Salta el hueco (Espacio / A). Si caes, la red te devuelve.',
+  jump: 'Salta el hueco ({jump}). Si caes, la red te devuelve.',
   high: 'Mantén el salto para llegar más alto y sube al escalón.',
-  box: 'Coge la caja (E / RT), déjala sobre el botón y cruza la puerta.',
-  swing: 'Lanza el puño cableado al anillo (clic / X), balancéate y suelta al final.',
-  spring: 'Engancha el anillo del muro, mantén LT (clic derecho) para recoger y cargar el muelle… ¡y suéltalo!',
+  box: 'Coge la caja ({grab}), déjala sobre el botón y cruza la puerta.',
+  swing: 'Apunta al anillo y mantén el gancho ({primary}): te engancha y te recoge. Balancéate y suelta al final del arco.',
+  spring: 'Mantén el gancho ({primary}) en el anillo del muro: al recogerlo del todo se carga el muelle… ¡suelta y sal disparado!',
   meet: 'Despierta a Ámbar-bot.',
   boost: 'Ámbar se agacha: salta sobre su cabeza para usarla de trampolín y sube al muro.',
-  hand: 'Arriba, ponte en el borde mirando a Ámbar y mantén RT (E) para ofrecerle la mano.',
+  hand: 'Arriba, ponte en el borde mirando a Ámbar y mantén {grab} para ofrecerle la mano.',
   cross: 'Ámbar cruza primero y te ofrece la mano…',
-  catch: 'Salta hacia Ámbar y agarra su mano en el aire (E / RT). También puedes lanzarle el puño (X).',
-  couple: 'Subid juntos a la placa y mantened Y (R) para acoplaros.',
+  catch: 'Salta hacia Ámbar y agarra su mano en el aire ({grab}). También puedes lanzarle el gancho ({primary}).',
+  couple: 'Subid juntos a la placa y mantened {couple} para acoplaros.',
   walk: 'Unidos: tu stick mueve tu pierna izquierda. Ámbar te sigue el paso. Caminad hasta el primer hueco.',
-  hop: 'Pulsa A tú solo: un bote unilateral basta para este hueco pequeño.',
-  joint: 'Ahora Ámbar saltará contigo: pulsad A a la vez para el salto conjunto.',
-  sling: 'Lanzad los brazos a los dos anillos (X), tensad (LT) hasta el máximo y disparad a la vez (X).',
-  split: 'Mantened Y (R) para separaros sobre suelo ancho.',
+  hop: 'Pulsa {jump} tú solo: un bote unilateral basta para este hueco pequeño.',
+  joint: 'Ahora Ámbar saltará contigo: pulsad {jump} a la vez para el salto conjunto.',
+  sling: 'Mantened el gancho ({primary}) en los dos anillos hasta tensar al máximo… y soltad a la vez.',
+  split: 'Mantened {couple} para separaros sobre suelo ancho.',
   done: '¡Taller completado!',
 }
 
@@ -113,7 +113,7 @@ export function Tutorial() {
         if (p.z < -33 && me.grounded) { reachCheckpoint('t3'); go('swing') }
         break
       case 'swing':
-        if (me.cable.state === 'attached') once('reelhint', () => say.toast('Balancéate con el stick. Suelta con X o salta con A al final del arco.', 'info'))
+        if (me.cable.state === 'attached') once('reelhint', () => say.toast('Balancéate con el stick y suelta el gancho al final del arco (o salta con {jump}).', 'info'))
         if (p.z < -45 && me.grounded && feet > 0.5) { reachCheckpoint('t4'); go('spring'); G.medals.add('tutorial') }
         break
       case 'spring':
@@ -226,20 +226,20 @@ export function Tutorial() {
       <Block pos={[0, 1, -27]} size={[8, 9, 10]} />
       <Crate id="box-t" pos={[2.4, 1.6, -25]} />
       <Switch id="t_box" pos={[-2.2, 1, -29.4]} radius={0.85} crates robots={false} />
-      <Sign pos={[-2.2, 3, -30.6]} text="Caja aquí" sub="coge con E / RT" small />
+      <Sign pos={[-2.2, 3, -30.6]} text="Caja aquí" sub="coge la caja" small />
       <Gate pos={[0, 1, -31.7]} size={[7.6, 2.8, 0.5]} openVar="sw:t_box" />
 
       {/* T4 swing */}
       <Block pos={[0, 1, -36]} size={[8, 9, 8]} />
       <Ring id="t_swing" pos={[0, 4.4, -42.2]} mount="hang" big={false} />
       <SafetyNet pos={[0, -1, -42]} size={[8, 4]} returnTo={[0, 1, -38]} />
-      <Sign pos={[3.2, 3.2, -38.5]} rotY={-0.4} text="Puño cableado" sub="X / clic: lánzalo al anillo" small />
+      <Sign pos={[3.2, 3.2, -38.5]} rotY={-0.4} text="Gancho" sub="mantén para engancharte" small />
       <Block pos={[0, 1, -49.75]} size={[8, 9, 11.5]} />
 
       {/* T5 spring launch up the cliff */}
       <Block pos={[0, 5, -62]} size={[12, 13, 13]} />
       <Ring id="t_wall" pos={[0, 4.3, -55.15]} mount="wall" big={false} facing={0} />
-      <Sign pos={[-3, 3.4, -52]} rotY={0.4} text="Muelle" sub="mantén LT y suelta" small />
+      <Sign pos={[-3, 3.4, -52]} rotY={0.4} text="Muelle" sub="mantén, carga y suelta" small />
       <Tree pos={[-4.5, 5, -64]} />
       <Beacon pos={[4.5, 5, -58]} id="t5" />
 

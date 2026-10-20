@@ -62,9 +62,10 @@ function fillLocalPilot(pf: PilotFrame, inp: StepInput) {
   pf.brake = inp.held.brake
   pf.couple = inp.held.couple
   pf.grab = inp.held.grab
-  pf.reel = inp.held.secondary
+  pf.reel = inp.held.primary
   if (inp.pressed.jump) pf.jumps.push(G.time)
   if (inp.pressed.primary) pf.xs.push(G.time)
+  if (inp.released.primary) pf.xr.push(G.time)
 }
 
 export function Simulation() {
@@ -91,6 +92,7 @@ export function Simulation() {
     }))
     offs.push(s.on('pj', (d: { t: number }) => remotePilot.jumps.push(Math.min(d.t, s.hostTime()))))
     offs.push(s.on('px', (d: { t: number }) => remotePilot.xs.push(Math.min(d.t, s.hostTime()))))
+    offs.push(s.on('pxr', (d: { t: number }) => remotePilot.xr.push(Math.min(d.t, s.hostTime()))))
     offs.push(s.on('pause', (d: { on: boolean }) => { G.paused = d.on; useHud.setState({ paused: d.on }) }))
 
     // Generic host interactions: boxes and rescues.
@@ -209,9 +211,10 @@ export function Simulation() {
         rp.grab = remotePilot.grab; rp.reel = remotePilot.reel
         rp.jumps.push(...remotePilot.jumps); remotePilot.jumps.length = 0
         rp.xs.push(...remotePilot.xs); remotePilot.xs.length = 0
+        rp.xr.push(...remotePilot.xr); remotePilot.xr.length = 0
       }
       if (G.big.active) stepBig(world, G.big, pilots, dt)
-      else { for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0 } }
+      else { for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0; p.xr.length = 0 } }
       hostForm(world, dt)
       hostCarry()
       for (const fn of G.hostLogic) fn(dt)
@@ -225,6 +228,7 @@ export function Simulation() {
         // Instant local feedback; the host resolves the joint window fairly.
         if (localIn.pressed.jump) { s.send('pj', { t: G.time }); G.big.ready[localSlot()] = 1; sfx(localSlot() === 0 ? 'beepCyan' : 'beepAmber', G.big.pos, 0.6) }
         if (localIn.pressed.primary) s.send('px', { t: G.time })
+        if (localIn.released.primary) s.send('pxr', { t: G.time })
       }
     }
     if (import.meta.env.DEV) (window as any).__onStep?.()
@@ -252,7 +256,7 @@ export function Simulation() {
       const mv = camRelative(human.frame.move, G.cam.yaw, tmp2)
       const aim = pilotAim(tmp)
       const f = human.frame.held
-      const msg = { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], b: f.brake ? 1 : 0, c: f.couple ? 1 : 0, g: f.grab ? 1 : 0, r: f.secondary ? 1 : 0 }
+      const msg = { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], b: f.brake ? 1 : 0, c: f.couple ? 1 : 0, g: f.grab ? 1 : 0, r: f.primary ? 1 : 0 }
       const key = JSON.stringify(msg)
       if (key !== lastIntent || acc.intent >= 1 / NET.poseHz) {
         acc.intent = 0

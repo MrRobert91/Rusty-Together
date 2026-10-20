@@ -19,11 +19,16 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
   2. **Cintas cruzadas** (separados): dos cintas a contracorriente y una caja con el nombre de cada uno. El tope de una cinta abre la barrera de la otra (relevo) y hay una única «carga rápida» que te ayuda a ti y acelera la cinta del compañero durante 5 s.
   3. **Carrera de muelles** (opcional): arena de un minuto con doble consentimiento, dos rondas de 20 s, campanas propias, empujones con el puño, empate permitido y una pegatina de sesión para quien gane.
   4. **Primer cuerpo** (unidos): placa de acoplamiento con consentimiento doble de 0,6 s. La dirección del cuerpo es la media de las dos piernas. Primero un bote unilateral y después saltos conjuntos (ventana de 250 ms).
-  5. **Pasamanos de grúas** (unidos): un balancín físico, anillos alternos con brazos telescópicos de 8 m y un tirachinas de 6 m con doble confirmación en 350 ms.
+  5. **Pasamanos de grúas** (unidos): un balancín físico, anillos alternos con brazos telescópicos de 8 m y un tirachinas de 6 m: se tensa manteniendo el gancho y se dispara soltando los dos dentro de 350 ms.
   6. **Cangrejo clasificador** (clímax con las dos formas):
      - **A:** cada mini engancha un pestillo y lo arrastra a la cinta, esquivando barridos avisados con 1 s de antelación.
      - **B:** unidos, agarran las asas; uno ancla mientras el otro tira, y luego intercambian los papeles para extraer el fusible.
      - **C:** esquivan el barrido bajo con un salto conjunto y llevan el fusible a la toma.
+- **Obstáculos móviles con física** en el nivel 1, todos con aviso legible y sin muerte instantánea (empujan y aturden):
+  - **Barredoras:** brazos acolchados que giran sobre un eje con baliza. Un anillo de peligro en el suelo marca el área barrida; hay que saltar el brazo a tiempo. Hay una de calentamiento en la Escuela de guantes y otra de dos brazos en el patio tras las cintas.
+  - **Carga suelta:** un contenedor cuelga de una grúa pórtico y barre la pasarela del Primer cuerpo. Las lámparas del pórtico se encienden ~0,8 s antes en el lado hacia el que va.
+  - El movimiento depende solo del reloj compartido, así que los dos clientes ven exactamente lo mismo sin tráfico de red; cada cliente resuelve los golpes de los robots que simula.
+- **Muelles vivos:** contenedores apilados, defensas de neumático, bolardos, farolas, tuberías, bordes con chevrones, banderas y mangas de viento animadas, respiraderos de vapor, grúas torre que trabajan (giran, mueven el carro y la carga se balancea), teleféricos de paquetes, dirigibles, gaviotas y un horizonte de muelles flotantes.
 - **Online con salas privadas.** El anfitrión crea una sala y recibe un **código de 5 caracteres**; el invitado se une con ese código. Hay lobby con colores intercambiables, «listo», reconexión (90 s para el invitado) y pausa compartida.
 - **Chat de voz por proximidad** (WebRTC). La voz del compañero sale de su robot, con panorámica HRTF, y se atenúa con la distancia entre los robots: volumen pleno a menos de 7 m y casi silencio a 32 m. Se puede silenciar (M) o usar «pulsar para hablar» (V). Ningún obstáculo exige hablar.
 - **Física real con Rapier.** Los robots son cápsulas dinámicas con un controlador propio, que incluye coyote time, búfer de salto, salto variable y gravedad asimétrica. Las cuerdas tienen péndulo real; las cajas, el balancín y el peso de los robots son físicos.
@@ -53,9 +58,8 @@ npm run dev          # cliente Vite (http://localhost:5173) + servidor Colyseus 
 | Stick der. | Ratón | Cámara | Apuntar **tu** brazo |
 | A | Espacio | Saltar (mantén = más alto) | Impulso de tu pierna (dos a la vez = salto conjunto) |
 | B | Shift | Agacharse · hacer de trampolín | Anclar tu pierna (pivote) |
-| RT | E | Agarrar · ofrecer la mano · coger cajas | Agarrar asas con tu mano |
-| X | Clic izq. / F | Puño cableado (4 m) | Brazo telescópico (8 m) · tirachinas |
-| LT | Clic der. / Q | Recoger cable · cargar muelle | Tensar tu cable |
+| **RT** (o X) | **Clic izq.** / F | **Gancho (4 m), un solo botón:** mantén para engancharte y recoger cable; al recogerlo del todo se carga el muelle. Suelta para soltarte (con carga, sales disparado). Un toque rápido da un tirón hacia el anillo. | **Brazo telescópico (8 m):** mantén para engancharte y tensar; suelta para soltar. Tirachinas: tensad al máximo y **soltad a la vez** |
+| LT | E / Clic der. / Q | Agarrar · ofrecer la mano · coger cajas | Agarrar asas con tu mano |
 | Y (mantener) | R | Acoplarse en una placa | Separarse |
 | RB | G | Señalar un punto | Señalar |
 | Cruceta | 1-4 | Gestos | Gestos |
@@ -67,7 +71,7 @@ Se juega en horizontal. Al primer toque el juego pasa a pantalla completa y bloq
 
 - **Pulgar izquierdo:** stick flotante. Aparece donde apoyas el dedo y se arrastra contigo si te pasas del borde, así que nunca hay que volver al centro.
 - **Pulgar derecho:** arrastra en cualquier zona libre para mover la cámara. Unidos, ese arrastre apunta tu brazo.
-- **Botones en arco alrededor de *Saltar*:** Puño, Tensar y Agarrar en el primer anillo; Agachar y Unir, más pequeños, en el segundo. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
+- **Botones en arco alrededor de *Saltar*:** Gancho (🪝, mantener) y Agarrar en el primer anillo; Agachar y Unir, más pequeños, en el segundo. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
 - Los botones que pide el juego parpadean. Los textos de objetivo cambian «RT», «X»… por los iconos de pantalla.
 - Hay vibración háptica. En *Ajustes → Pantalla táctil* se cambian la sensibilidad, el tamaño de los botones y la vibración.
 - Arriba a la derecha están el micro (online), la señal, los gestos y la pausa.
