@@ -98,29 +98,36 @@ export function Seesaw({ id, pos, size, limit = 0.32 }: { id: string; pos: V3; s
   }, [id, host])
   const q = useMemo(() => new THREE.Quaternion(), [])
   const e = useMemo(() => new THREE.Euler(), [])
-  useFrame(() => {
+  useFrame((_, dt) => {
     if (!host || !body.current) return
     const b = body.current
     const r = b.rotation()
     q.set(r.x, r.y, r.z, r.w)
     e.setFromQuaternion(q, 'XYZ')
     const av = b.angvel()
-    // Limits.
+    // Soft limits: kill outward spin at the stops (no teleporting the plank
+    // out from under whoever stands on it).
     if (Math.abs(e.x) > limit) {
       const s = Math.sign(e.x)
-      e.x = s * limit
-      q.setFromEuler(e)
-      b.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true)
-      if (Math.sign(av.x) === s) b.setAngvel({ x: -av.x * 0.25, y: 0, z: 0 }, true)
-      if (Math.abs(av.x) > 0.4) fx('sfx', { n: 'clank', p: new THREE.Vector3(...pos) })
+      if (Math.sign(av.x) === s) {
+        if (Math.abs(av.x) > 0.35) fx('sfx', { n: 'clank', p: new THREE.Vector3(...pos) })
+        b.setAngvel({ x: -av.x * 0.2, y: 0, z: 0 }, true)
+      }
+      if (Math.abs(e.x) > limit + 0.04) {
+        e.x = s * (limit + 0.04)
+        q.setFromEuler(e)
+        b.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true)
+      }
     }
-    // Self-levelling + damping.
-    b.applyTorqueImpulse({ x: (-e.x * 900 - av.x * 160) / 60, y: 0, z: 0 }, true)
+    // Self-levelling spring + damping (tuned for the plank's real inertia).
+    const K = 12000
+    const C = 11000
+    b.applyTorqueImpulse({ x: ((-e.x * K - av.x * C) * Math.min(dt, 1 / 30)), y: 0, z: 0 }, true)
   })
   return (
     <>
-      <RigidBody ref={body} type={host ? 'dynamic' : 'kinematicPosition'} position={pos} colliders={false} enabledRotations={[true, false, false]} enabledTranslations={[false, false, false]} mass={220} angularDamping={0.6} canSleep={false}>
-        <CuboidCollider args={[w / 2, h / 2, d / 2]} friction={0.8} />
+      <RigidBody ref={body} type={host ? 'dynamic' : 'kinematicPosition'} position={pos} colliders={false} enabledRotations={[true, false, false]} enabledTranslations={[false, false, false]} angularDamping={0.3} canSleep={false}>
+        <CuboidCollider args={[w / 2, h / 2, d / 2]} friction={0.8} density={60} />
         <mesh geometry={worldBox(w, h, d, 2)} material={envMat('wood')} castShadow receiveShadow />
         {[-1, 1].map((s) => <mesh key={s} geometry={worldBox(0.2, h + 0.12, d, 2)} material={envMat('yellow')} position={[(s * w) / 2, 0.02, 0]} castShadow />)}
         {[-1, 1].map((s) => <mesh key={'e' + s} geometry={worldBox(w, h + 0.1, 0.25, 1)} material={envMat('hazard')} position={[0, 0.02, (s * (d - 0.3)) / 2]} />)}

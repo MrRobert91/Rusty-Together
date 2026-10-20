@@ -268,13 +268,14 @@ function LevelDone() {
   const d = useHud((s) => s.levelDone)!
   const session = useApp((s) => s.session)
   const isSolo = session?.mode === 'solo'
+  const isTutorial = G.level === 'tutorial'
   const mins = Math.floor(d.time / 60)
   const secs = Math.floor(d.time % 60)
   return (
     <div className="level-done">
       <div className="ld-card">
-        <div className="ld-kicker">{isSolo ? 'Tutorial completado' : 'Nivel 1 completado'}</div>
-        <div className="ld-title">{isSolo ? '¡Listos para la fábrica!' : '¡Fusible recuperado!'}</div>
+        <div className="ld-kicker">{isTutorial ? 'Tutorial completado' : 'Nivel 1 · Muelles de rebote'}</div>
+        <div className="ld-title">{isTutorial ? '¡Listos para la fábrica!' : '¡Fusible recuperado!'}</div>
         <div className="ld-time">{mins}:{String(secs).padStart(2, '0')}</div>
         <div className="ld-stats">
           {Object.entries(d.stats).map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}
@@ -286,7 +287,7 @@ function LevelDone() {
         <div className="ld-actions">
           {isSolo ? (
             <>
-              <button className="menu-btn primary" data-nav onClick={() => startSolo('tutorial')}>Repetir tutorial</button>
+              <button className="menu-btn primary" data-nav onClick={() => startSolo(G.level)}>Repetir</button>
               <button className="menu-btn" data-nav onClick={backToMenu}>Menú principal · jugar online</button>
             </>
           ) : session?.isHost ? (

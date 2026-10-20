@@ -343,30 +343,36 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   }
   if (inp.pressed.grab) {
     if (m.carrying) {
+      // Drop (and never re-grab in the same press).
       facing(m, fwd)
       act('drop', { id: m.carrying, v: [v.x * 0.5 + fwd.x * 1.4, 1.6, v.z * 0.5 + fwd.z * 1.4] })
       m.carrying = null
       fx('sfx', { n: 'release', p: m.pos })
-    } else if (partner.offering && !partner.hidden) {
-      const range = settings().assist ? MINI.assistGloveRange : MINI.gloveRange
-      tmp.copy(m.pos).addScaledVector(UP, 0.5)
-      if (tmp.distanceTo(partner.glove) < range) {
-        m.hangOn = partner.slot
-        m.hangT = 0
-        fx('sfx', { n: 'grab', p: m.pos })
-        fx('particles', { n: 'burst', p: partner.glove, c: '#ffffff', s: 0.5 })
+    } else {
+      let took = false
+      if (partner.offering && !partner.hidden) {
+        const range = settings().assist ? MINI.assistGloveRange : MINI.gloveRange
+        tmp.copy(m.pos).addScaledVector(UP, 0.5)
+        if (tmp.distanceTo(partner.glove) < range) {
+          m.hangOn = partner.slot
+          m.hangT = 0
+          took = true
+          fx('sfx', { n: 'grab', p: m.pos })
+          fx('particles', { n: 'burst', p: partner.glove, c: '#ffffff', s: 0.5 })
+        }
       }
-    }
-    if (!m.carrying && m.hangOn < 0) {
-      const box = nearestBox(m)
-      if (box) {
-        m.carrying = box
-        m.offering = false
-        act('grab', { id: box })
-        fx('sfx', { n: 'grab', p: m.pos })
+      if (!took && m.hangOn < 0) {
+        const box = nearestBox(m)
+        if (box) {
+          m.carrying = box
+          m.offering = false
+          act('grab', { id: box })
+          fx('sfx', { n: 'grab', p: m.pos })
+        }
       }
     }
   }
+
 
   /* ---- horizontal ---- */
   let maxS = m.carrying ? MINI.carrySpeed : m.crouch ? MINI.crouchSpeed : MINI.speed

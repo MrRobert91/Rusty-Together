@@ -158,6 +158,9 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
   const anchored1 = P[1].brake && B.grounded
   if ((anchored0 && a1 && !a0) || (anchored1 && a0 && !a1)) { speed *= 0.3; turnRate = 9 }
   if (anchored0 && anchored1) speed = 0
+  // Hands on fixed handles hold the body in place; legs only lever.
+  const holdingFixed = B.arms.some((a) => a.grip && !a.grip.startsWith('f'))
+  if (holdingFixed) speed = 0
   if (B.carrying) speed *= 0.8
   if (B.stunT > 0) speed = 0
   const dir = avg.lengthSq() > 1e-4 ? tmp.copy(avg).normalize() : tmp.set(0, 0, 0)
@@ -176,7 +179,7 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
   }
   v.x = rel.x + gv.x
   v.z = rel.z + gv.z
-  if (avg.lengthSq() > 0.02 && B.stunT <= 0 && !(hanging && !B.grounded)) B.yaw = dampAngle(B.yaw, Math.atan2(avg.x, avg.z), turnRate, dt)
+  if (avg.lengthSq() > 0.02 && B.stunT <= 0 && !holdingFixed && !(hanging && !B.grounded)) B.yaw = dampAngle(B.yaw, Math.atan2(avg.x, avg.z), turnRate, dt)
 
   /* ---- jumping: unilateral hop, upgraded to a joint jump ---- */
   const W = window_(BIG.jumpWindow)
@@ -370,12 +373,16 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
       }
       tmp.copy(a.pos).sub(B.pos)
       const dist = tmp.length()
+      tmp.divideScalar(Math.max(dist, 1e-3))
       if (dist > c.len) {
-        tmp.divideScalar(dist)
         const radial = v.dot(tmp)
         if (radial < 0) v.addScaledVector(tmp, -radial * 0.5)
-        v.addScaledVector(tmp, (dist - c.len) * 8)
+        v.addScaledVector(tmp, Math.min(dist - c.len, 1.5) * 8)
         if (B.grounded && a.pos.y > B.pos.y + 0.5) B.grounded = false
+      } else if (dist < c.len + 0.1) {
+        // Don't overshoot past the anchor when reeling hard.
+        const radial = v.dot(tmp)
+        if (radial > 0) v.addScaledVector(tmp, -radial * 0.2)
       }
       if (a.sling) {
         slingArms++

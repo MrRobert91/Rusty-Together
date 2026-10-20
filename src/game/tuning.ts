@@ -58,7 +58,7 @@ export const BIG = {
   coupleHold: 0.6,
   coupleSpan: 2,
   mergeTime: 1.2,
-  gripRange: 1.6,
+  gripRange: 2.2,
 }
 
 export const NET = {

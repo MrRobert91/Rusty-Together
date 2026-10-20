@@ -27,6 +27,8 @@ export const plates = new Map<string, Plate>()
 /** Optional AI driver for the solo partner (tutorial). */
 export const aiDriver: { mini: ((inp: StepInput, dt: number) => void) | null; pilot: ((pf: PilotFrame, local: PilotFrame, dt: number) => void) | null } = { mini: null, pilot: null }
 
+if (import.meta.env.DEV) (window as any).__aiDriver = aiDriver
+
 /** Whether joined bodies may split right now (levels can forbid it). */
 export const formRules = { canSplit: (_p: THREE.Vector3) => true }
 

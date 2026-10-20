@@ -149,8 +149,8 @@ function Room2() {
       <TurboPad side="R" pos={[1.6, 2.42, -44.8]} />
 
       {/* Box sockets → lane doors */}
-      <Switch id="sockL" pos={[-3, 2.42, -48.6]} radius={0.85} crates robots={false} color="#22c7d6" />
-      <Switch id="sockR" pos={[3, 2.42, -48.6]} radius={0.85} crates robots={false} color="#ff9a1f" />
+      <Switch id="sockL" pos={[-3, 2.42, -48.6]} radius={1.15} crates robots={false} color="#22c7d6" />
+      <Switch id="sockR" pos={[3, 2.42, -48.6]} radius={1.15} crates robots={false} color="#ff9a1f" />
       <Gate pos={[-3, 2.4, -50.2]} size={[3.6, 2.6, 0.4]} openVar="sw:sockL" color="#22c7d6" />
       <Gate pos={[3, 2.4, -50.2]} size={[3.6, 2.6, 0.4]} openVar="sw:sockR" color="#ff9a1f" />
       <GoldenNut id="n3" pos={[0, 5.6, -41.4]} />
@@ -224,7 +224,7 @@ function Room5() {
       <Sign pos={[-4, 5.6, -116]} rotY={0.5} text="Pasamanos de grúas" sub="un brazo sujeta, el otro avanza" />
       <Scaffold pos={[5.5, 3.4, -121]} w={3} d={3} h={9} />
       {/* Seesaw over the void, with rings above both ends */}
-      <Seesaw id="seesaw" pos={[0, 3.2, -131]} size={[3.5, 0.4, 10]} />
+      <Seesaw id="seesaw" pos={[0, 3.2, -131.4]} size={[3.5, 0.4, 10]} />
       <Ring id="r5_s1" pos={[-1.6, 9.2, -127.5]} mount="hang" mini={false} />
       <Ring id="r5_s2" pos={[1.6, 9.2, -134.5]} mount="hang" mini={false} />
       <CraneBeam from={[0, -124]} to={[0, -152]} y={11.3} />
