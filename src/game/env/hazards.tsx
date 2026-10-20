@@ -301,7 +301,7 @@ export function Pendulum({ pivot, floor, length, amp, period, axis = 'x', phase 
     if (side !== 0 && side !== st.current.lastSide) sfx('tick', P, 0.35)
     st.current.lastSide = side
     const dir = axis === 'x' ? tmp.set(Math.sign(angVel), 0, 0) : tmp.set(0, 0, Math.sign(angVel))
-    if (biasV) dir.multiplyScalar(0.45).addScaledVector(biasV, 0.75).normalize()
+    if (biasV) dir.multiplyScalar(0.25).add(biasV).normalize()
     if (vel < 1.2) return
     const hx = bob[0] / 2, hy = bob[1] / 2, hz = bob[2] / 2
     for (const m of ownMinis()) {

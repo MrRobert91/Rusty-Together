@@ -277,7 +277,7 @@ export function glyph(b: Btn, device: Device = lastDevice): string {
   if (device === 'pad') {
     return ({ jump: 'A', brake: 'B', primary: 'RT', couple: 'Y', grab: 'LT', signal: 'RB', camera: 'LB', pause: '☰', emote1: '↑', emote2: '→', emote3: '↓', emote4: '←', talk: '—', mute: '⧉' } as Record<Btn, string>)[b]
   }
-  return ({ jump: 'Espacio', brake: 'Shift', primary: 'Clic izq.', couple: 'R', grab: 'Clic der.', signal: 'G', camera: 'Ratón', pause: 'Esc', emote1: '1', emote2: '2', emote3: '3', emote4: '4', talk: 'V', mute: 'M' } as Record<Btn, string>)[b]
+  return ({ jump: 'Espacio', brake: 'Shift', primary: 'Clic izq.', couple: 'R', grab: 'E', signal: 'G', camera: 'Ratón', pause: 'Esc', emote1: '1', emote2: '2', emote3: '3', emote4: '4', talk: 'V', mute: 'M' } as Record<Btn, string>)[b]
 }
 
 /** Touch glyphs match the icons drawn on the on-screen buttons. */

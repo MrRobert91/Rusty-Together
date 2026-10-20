@@ -245,7 +245,7 @@ function Room4() {
       <Flag pos={[-6.4, 2.4, -81.2]} color="#22c7d6" h={4.6} />
       <Flag pos={[6.4, 2.4, -81.2]} color="#ff9a1f" h={4.6} />
       {/* Joined-body hazard: a crated load swinging across the walkway */}
-      <Pendulum pivot={[0, 9.4, -87.6]} floor={-9} length={5.8} amp={0.62} period={4.2} span={7.4} bias={[0, 0, 1]} bob={[1.5, 1.3, 1.5]} />
+      <Pendulum pivot={[0, 9.4, -87.6]} floor={-9} length={5.8} amp={0.62} period={4.2} span={7.4} force={6} bias={[0, 0, 1]} bob={[1.5, 1.3, 1.5]} />
       <Sign pos={[-3.4, 4.2, -83.2]} rotY={0.6} text="Carga suelta" sub="esperad a que pase" small />
       {/* F: walkway to learn walking with two legs */}
       <Block pos={[0, 2.4, -87]} size={[6, 10.4, 10]} />
@@ -367,6 +367,10 @@ function CrabArenaGeometry() {
       <Flag pos={[-12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
       <Flag pos={[12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
       <HazardEdge pos={[0, 3.4, -164.92]} len={28} />
+      <CargoStack pos={[11.6, 3.4, -169]} rotY={Math.PI / 2} cols={2} layers={2} seed={41} />
+      <CargoStack pos={[-11.8, 3.4, -168.6]} rotY={Math.PI / 2} cols={1} layers={3} seed={43} />
+      <SteamVent pos={[10.5, 3.4, -181]} every={2.9} />
+      <SteamVent pos={[-10.5, 3.4, -179]} every={3.3} offset={1.4} />
       {/* Elevator to the garden (lights up at the end) */}
       <ElevatorDecor />
     </>
