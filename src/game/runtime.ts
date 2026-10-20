@@ -305,4 +305,4 @@ export function camRelative(move: { x: number; y: number }, yaw: number, out = n
   return out
 }
 
-if (import.meta.env.DEV) (window as any).__G = G
+if (import.meta.env.DEV && typeof window !== 'undefined') (window as any).__G = G

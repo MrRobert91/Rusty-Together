@@ -8,7 +8,7 @@ import { cameraRef } from '../game/CameraRig'
 import { SLOT_COLOR, SLOT_NAME } from '../game/tuning'
 import { useApp } from './appStore'
 import { backToMenu, startSolo } from './App'
-import { lobbySend } from '../net/online'
+import { lobbySend, useLobby } from '../net/online'
 import { useSettings } from '../core/settings'
 
 function useDevice() {
@@ -101,6 +101,7 @@ export function Hud() {
       {showFps && <Fps />}
       <div className="fade" style={{ opacity: h.fade }} />
       {h.levelDone && <LevelDone />}
+      <PeerDropped />
     </div>
   )
 }
@@ -302,6 +303,20 @@ function LevelDone() {
             </>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function PeerDropped() {
+  const dropped = useLobby((s) => s.peerDropped)
+  const session = useApp((s) => s.session)
+  if (!dropped || session?.mode !== 'online') return null
+  return (
+    <div className="peer-dropped">
+      <div className="ld-card">
+        <div className="ld-kicker">Conexión</div>
+        <div className="banner-sub">Tu compañero se ha desconectado. Esperando a que vuelva (hasta 90 s)…</div>
       </div>
     </div>
   )

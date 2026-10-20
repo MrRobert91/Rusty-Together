@@ -60,9 +60,10 @@ export function Game({ level, session }: { level: string; session: Session }) {
       dpr={quality === 'high' ? [1, 1.75] : [0.75, 1.25]}
       gl={{ antialias: false, powerPreference: 'high-performance', stencil: false }}
       camera={{ fov: 55, near: 0.1, far: 900, position: [0, 5, 10] }}
-      onCreated={({ gl }) => {
+      onCreated={({ gl, scene }) => {
+        if (import.meta.env.DEV) (window as any).__scene = scene
         gl.toneMapping = THREE.NoToneMapping
-        gl.shadowMap.type = THREE.PCFSoftShadowMap
+        gl.shadowMap.type = THREE.PCFShadowMap
       }}
     >
       <Suspense fallback={null}>

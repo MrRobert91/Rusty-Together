@@ -207,7 +207,7 @@ export function Arena() {
 
       {/* Arena platform */}
       <Block pos={ARENA_C.toArray() as [number, number, number]} size={[16, 10, 16]} />
-      <mesh geometry={GEO.cyl()} material={M.accent('#ffe1b3')} position={[ARENA_C.x, ARENA_C.y + 0.02, ARENA_C.z]} scale={[6, 0.04, 6]} receiveShadow />
+      <mesh geometry={GEO.cyl()} material={M.accent('#e9cfa2')} position={[ARENA_C.x, ARENA_C.y + 0.02, ARENA_C.z]} scale={[6, 0.04, 6]} receiveShadow />
       <mesh geometry={GEO.torus()} material={M.accent('#ff9a1f')} rotation-x={Math.PI / 2} position={[ARENA_C.x, ARENA_C.y + 0.05, ARENA_C.z]} scale={[6, 6, 0.6]} />
       {/* Padded walls keep the scuffle inside */}
       <Wall pos={[ARENA_C.x, ARENA_C.y, ARENA_C.z - 7.9]} size={[16, 1.2, 0.4]} kind="pad" />

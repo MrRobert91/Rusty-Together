@@ -383,7 +383,10 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   if (m.grounded) accel = target.lengthSq() > 0.01 ? MINI.accelGround : MINI.decelGround
   else accel = m.launchedT > 0 ? 7 : MINI.accelAir
   const relLen = rel.length()
-  if (!m.grounded && relLen > maxS + 0.5 && m.launchedT <= 0) {
+  if (!m.grounded && m.launchedT > 0) {
+    // Ballistic (spring, climb, net return): keep the arc, input only nudges.
+    rel.addScaledVector(move, 3 * dt)
+  } else if (!m.grounded && relLen > maxS + 0.5) {
     // Keep momentum from launches; input only steers.
     const along = target.dot(rel) / Math.max(relLen, 1e-3)
     tmp.copy(target).addScaledVector(rel, -along / relLen)

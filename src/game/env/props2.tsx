@@ -51,7 +51,7 @@ export function Bell({ id, pos }: { id: string; pos: V3 }) {
   const anchor = useMemo(() => addAnchor({ id, kind: 'bell', pos: new THREE.Vector3(pos[0], pos[1] + 2.1, pos[2]), mini: true, big: false }), [id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { G.anchors.set(id, anchor); return () => { G.anchors.delete(id) } }, [id, anchor])
   const bell = useRef<THREE.Group>(null!)
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#b9a46a', metalness: 0.85, roughness: 0.25, emissive: '#000000' }), [])
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c9a64a', metalness: 0.9, roughness: 0.22, emissive: '#000000', side: THREE.DoubleSide }), [])
   const st = useRef({ ringT: -9, last: -1 })
   useFrame(() => {
     const owner = G.vars[`bell:${id}`] as number | undefined
@@ -70,14 +70,21 @@ export function Bell({ id, pos }: { id: string; pos: V3 }) {
       <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={1.1} scale={[0.08, 2.2, 0.08]} castShadow />
       <mesh geometry={worldBox(0.9, 0.1, 0.1)} material={envMat('yellow')} position-y={2.55} />
       <group ref={bell} position-y={2.5}>
-        <mesh material={mat} position-y={-0.35} castShadow>
-          <cylinderGeometry args={[0.14, 0.38, 0.5, 18, 1, true]} />
-        </mesh>
+        <mesh material={mat} geometry={bellGeo()} position-y={-0.62} castShadow />
         <mesh material={mat} position-y={-0.08} geometry={GEO.sphere()} scale={[0.15, 0.1, 0.15]} />
       </group>
       <mesh geometry={GEO.cyl()} material={envMat('orange')} scale={[0.45, 0.12, 0.45]} position-y={0.06} />
     </group>
   )
+}
+
+let _bell: THREE.LatheGeometry | null = null
+/** Classic bell profile (lathe), so it reads as a bell and not a lamp. */
+function bellGeo() {
+  if (_bell) return _bell
+  const pts = [[0.0, 0.62], [0.12, 0.6], [0.17, 0.52], [0.19, 0.38], [0.22, 0.22], [0.3, 0.1], [0.42, 0.02], [0.44, 0.0], [0.4, 0.02]]
+  _bell = new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), 28)
+  return _bell
 }
 
 /* ------------------------------------------------------------ Seesaw */

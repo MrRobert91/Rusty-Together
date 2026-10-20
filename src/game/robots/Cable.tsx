@@ -74,7 +74,8 @@ export function CableView({ cable, from, color, thick = 4, fistScale = 1 }: Prop
     fist.current.lookAt(a)
     fist.current.rotateY(Math.PI)
     const sm = spring.current.material as THREE.MeshStandardMaterial
-    spring.current.scale.set(1, 1 + c.charge * 0.6 + (c.reeling ? Math.sin(t * 40) * 0.08 : 0), 1)
+    const k = 0.05 * (1 + c.charge * 0.6 + (c.reeling ? Math.sin(t * 40) * 0.08 : 0))
+    spring.current.scale.set(0.05, 0.05, k)
     sm.emissiveIntensity = c.charge * 3
   })
 

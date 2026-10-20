@@ -85,7 +85,7 @@ function Room1() {
       <Tree pos={[-4.8, 0, 1]} s={0.8} />
       <Scaffold pos={[7.5, -8, -2]} h={16} />
       <Banner pos={[5.8, 3.3, -9]} rotY={-Math.PI / 2} />
-      <Sign pos={[3.5, 2.2, -3]} rotY={-0.4} text="Escuela de guantes" sub="Sala 1 · separados" />
+      <Sign pos={[5.2, 2.2, -6.5]} rotY={-0.9} text="Escuela de guantes" sub="Sala 1 · separados" />
       {/* Practice swing pit (optional): ring over a net */}
       <Block pos={[-13, 0, -5]} size={[5, 8, 7]} />
       <Ring id="r1_practice" pos={[-8.3, 3.7, -5]} mount="hang" big={false} />
@@ -130,7 +130,7 @@ function Room2() {
       {[-39, -43.8, -48.6].map((z, i) => <Glass key={i} pos={[0, 2.4, z]} size={[1.2, 1.9, 2.6]} />)}
       <Wall pos={[-5.6, 2.4, -42.8]} size={[0.4, 1.9, 14.4]} />
       <Wall pos={[5.6, 2.4, -42.8]} size={[0.4, 1.9, 14.4]} />
-      <Sign pos={[0, 6, -35.8]} text="Cintas cruzadas" sub="cada uno abre el paso del otro" />
+      <Sign pos={[0, 5.1, -36.4]} text="Cintas cruzadas" sub="cada uno abre el paso del otro" small post={false} />
 
       {/* Your-name boxes */}
       <Crate id="boxL" pos={[-3, 3.4, -31.5]} label="CIAN" labelColor="#139aa8" />

@@ -41,7 +41,9 @@ button { font-family: inherit; }
 .logo.small { position: absolute; top: 22px; }
 @keyframes logoIn { from { transform: scale(0.6) translateY(30px); opacity: 0; } }
 
-.menu-screen { justify-content: center; }
+.menu-screen { justify-content: center; align-items: flex-start; padding-left: clamp(16px, 7vw, 120px); }
+.menu-screen .logo.small { left: clamp(16px, 7vw, 120px); transform: none; text-align: left; }
+@media (max-width: 760px) { .menu-screen { align-items: center; padding-left: 16px; } .menu-screen .logo.small { left: auto; } }
 .menu-panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 22px; padding: 22px; backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 10px; min-width: min(420px, 92vw); max-width: 92vw; animation: panelIn 0.45s cubic-bezier(.2, 1.2, .4, 1) both; }
 .menu-panel h2 { margin: 0 0 6px; font-size: 26px; }
 .menu-panel h3 { margin: 0; font-size: 19px; }
@@ -244,3 +246,5 @@ table.controls td { padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07
 .medal { display: flex; gap: 10px; align-items: center; background: rgba(255, 210, 58, 0.12); border-radius: 12px; padding: 7px 12px; font-weight: 600; text-align: left; animation: panelIn 0.4s both; }
 .medal span { font-size: 22px; }
 .ld-actions { display: flex; flex-direction: column; gap: 8px; }
+
+.peer-dropped { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 12, 20, 0.55); z-index: 35; }

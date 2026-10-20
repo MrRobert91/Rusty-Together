@@ -21,11 +21,11 @@ export function MenuBackdrop() {
             <Atmosphere />
             <Block pos={[0, 0, 0]} size={[10, 14, 8]} />
             <Block pos={[-9, -3, -6]} size={[6, 10, 6]} />
-            <Tree pos={[-3.5, 0, -2.5]} s={1.1} />
-            <Tree pos={[3.8, 0, -2.8]} s={0.8} />
+            <Tree pos={[-4.2, 0, -3.2]} s={1.1} />
+            <Tree pos={[3.8, 0, -3.4]} s={0.8} />
             <Scaffold pos={[10, -6, -10]} h={14} />
             <Banner pos={[2.6, 2.8, -3.9]} />
-            <Ring id="menu-ring" pos={[-2.2, 2.6, -1]} mount="post" />
+            <Ring id="menu-ring" pos={[2.9, 2.4, -1.6]} mount="post" />
           </Physics>
           <Duo />
           <OrbitCam />
@@ -45,9 +45,10 @@ export function MenuBackdrop() {
 
 function OrbitCam() {
   useFrame(({ camera, clock }) => {
-    const t = clock.elapsedTime * 0.06
-    camera.position.set(Math.sin(t) * 7.5 + 1.5, 2.6 + Math.sin(t * 2) * 0.3, Math.cos(t) * 6 + 4)
-    camera.lookAt(0.6, 1.0, 0)
+    // Gentle drift that keeps the duo in the right third of the frame.
+    const t = clock.elapsedTime * 0.12
+    camera.position.set(-1.6 + Math.sin(t) * 1.0, 2.3 + Math.sin(t * 0.7) * 0.25, 8.6 + Math.cos(t) * 0.5)
+    camera.lookAt(-1.9, 1.15, 0)
   })
   return null
 }
@@ -70,7 +71,7 @@ function Duo() {
     for (let i = 0; i < 2; i++) {
       const v = views[i]
       v.now = t
-      v.yaw = (i === 0 ? 0.5 : -0.4) + Math.sin(t * 0.4 + i) * 0.15
+      v.yaw = (i === 0 ? 0.1 : -0.7) + Math.sin(t * 0.4 + i) * 0.15
       const jt = t - v.jumpT
       const hop = jt < 0.5 ? Math.sin((jt / 0.5) * Math.PI) * 0.5 : 0
       v.grounded = hop < 0.02
@@ -81,8 +82,8 @@ function Duo() {
   })
   return (
     <>
-      <group ref={g[0]} position={[-0.7, 0, 0.6]}><RobotModel variant="mini" slot={0} view={views[0]} /></group>
-      <group ref={g[1]} position={[1.0, 0, 0.3]}><RobotModel variant="mini" slot={1} view={views[1]} /></group>
+      <group ref={g[0]} position={[0.7, 0, 1.4]}><RobotModel variant="mini" slot={0} view={views[0]} /></group>
+      <group ref={g[1]} position={[2.1, 0, 1.1]}><RobotModel variant="mini" slot={1} view={views[1]} /></group>
     </>
   )
 }
