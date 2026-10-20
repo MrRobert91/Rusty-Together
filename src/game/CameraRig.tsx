@@ -34,6 +34,9 @@ export function CameraRig() {
   }, [camera])
 
   useFrame((_, rawDt) => {
+    // Dev-only free camera for level dressing: window.__freeCam = { p: [x,y,z], t: [x,y,z] }.
+    const free = import.meta.env.DEV ? (window as any).__freeCam : null
+    if (free) { camera.position.set(free.p[0], free.p[1], free.p[2]); camera.lookAt(free.t[0], free.t[1], free.t[2]); return }
     const dt = Math.min(rawDt, 0.05)
     const s = st.current
     const C = G.cam

@@ -12,6 +12,8 @@ import { backdropCfg } from '../../env/Atmosphere'
 import { Arena } from './Arena'
 import { CrabRoom } from './Crab'
 import { MINI } from '../../tuning'
+import { Pendulum, Sweeper } from '../../env/hazards'
+import { Airship, Bollard, CargoLine, CargoStack, Container, DockCrane, DockSkyline, Fenders, Flag, Gulls, HazardEdge, LampPost, Pipes, SteamVent, Windsock, CARGO } from '../../env/docks'
 
 /*
  * Nivel 1 · Muelles de rebote (GDD). Six rooms along -Z:
@@ -65,6 +67,7 @@ export function Level1() {
       <Arena />
       <Room4 />
       <Room5 />
+      <DockLife />
       <CrabArenaGeometry />
       <CrabRoom />
       <Story />
@@ -86,6 +89,19 @@ function Room1() {
       <Scaffold pos={[7.5, -8, -2]} h={16} />
       <Banner pos={[5.8, 3.3, -9]} rotY={-Math.PI / 2} />
       <Sign pos={[5.2, 2.2, -6.5]} rotY={-0.9} text="Escuela de guantes" sub="Sala 1 · separados" />
+      {/* Warm-up hazard: a slow, low boom you hop over */}
+      <Sweeper pos={[-3.1, 0, -6.4]} radius={2.4} speed={0.85} />
+      <Sign pos={[-0.4, 2.0, -3.4]} rotY={-0.5} text="Barredora" sub="salta el brazo" small />
+      <CargoStack pos={[4.6, 0, -2.6]} rotY={Math.PI / 2} cols={2} layers={2} seed={3} />
+      <Fenders pos={[6.02, 0, -5]} rotY={Math.PI / 2} count={4} />
+      <Fenders pos={[-6.02, 0, -2]} rotY={-Math.PI / 2} count={2} />
+      <HazardEdge pos={[0, 0, 2.08]} len={12} />
+      <LampPost pos={[5.3, 0, -11]} rotY={-2.4} />
+      <LampPost pos={[-5.3, 0, 1.2]} rotY={0.6} />
+      <Windsock pos={[5.4, 0, 1.4]} />
+      <SteamVent pos={[2.6, 0, -9.6]} />
+      <Bollard pos={[-1.4, 0, 1.5]} />
+      <Bollard pos={[1.4, 0, 1.5]} />
       {/* Practice swing pit (optional): ring over a net */}
       <Block pos={[-13, 0, -5]} size={[5, 8, 7]} />
       <Ring id="r1_practice" pos={[-8.3, 3.7, -5]} mount="hang" big={false} />
@@ -96,7 +112,7 @@ function Room1() {
       {/* B: the wall (2.4 m) — springboard + offered hand */}
       <Block pos={[0, 2.4, -17]} size={[10, 10.4, 10]} />
       <HazardStrip pos={[0, 0.03, -11.6]} size={[10, 0.6]} />
-      <Sign pos={[-3.8, 1.8, -10.6]} rotY={0.2} text="¿Muy alto?" sub="agáchate (B): trampolín" small />
+      <Sign pos={[-3.8, 1.8, -10.6]} rotY={0.2} text="¿Muy alto?" sub="agáchate: trampolín" small />
       <Sign pos={[3.8, 4.2, -12.6]} rotY={-0.2} text="Desde arriba" sub="en el borde: ofrece la mano" small />
 
       {/* Gap with a high ring: only reachable from a partner's springboard */}
@@ -104,6 +120,17 @@ function Room1() {
       <SafetyNet pos={[0, 0.4, -23.8]} size={[10, 3.6]} returnTo={[0, 2.4, -20]} />
       <Block pos={[0, 2.4, -30.6]} size={[10, 10.4, 10]} />
       <Sign pos={[3.6, 4.4, -21]} rotY={-0.5} text="El guante" sub="el primero ayuda al segundo" small />
+      <Bollard pos={[4.3, 2.4, -21.3]} />
+      <Bollard pos={[-4.3, 2.4, -21.3]} />
+      <Bollard pos={[4.3, 2.4, -26.3]} />
+      <Bollard pos={[-4.3, 2.4, -26.3]} />
+      <Flag pos={[-4.4, 2.4, -12.6]} color="#22c7d6" />
+      <Flag pos={[4.4, 2.4, -12.6]} color="#ff9a1f" />
+      <Fenders pos={[5.02, 2.4, -17]} rotY={Math.PI / 2} count={4} />
+      <Fenders pos={[-5.02, 2.4, -30.6]} rotY={-Math.PI / 2} count={4} />
+      <Pipes pos={[-5.18, 1.2, -17]} len={8} rotY={Math.PI / 2} />
+      <LampPost pos={[4.5, 2.4, -35]} rotY={-2.6} />
+      <LampPost pos={[-4.5, 2.4, -35]} rotY={2.6} />
       <Beacon pos={[4.3, 2.4, -32]} id="c1c" />
       <GoldenNut id="n2" pos={[0, 8.6, -23.8]} />
     </>
@@ -131,6 +158,8 @@ function Room2() {
       <Wall pos={[-5.6, 2.4, -42.8]} size={[0.4, 1.9, 14.4]} />
       <Wall pos={[5.6, 2.4, -42.8]} size={[0.4, 1.9, 14.4]} />
       <Sign pos={[0, 5.1, -36.4]} text="Cintas cruzadas" sub="cada uno abre el paso del otro" small post={false} />
+      <Pipes pos={[-5.95, 3.3, -42.8]} len={13} rotY={Math.PI / 2} color="#2a7fc0" />
+      <Pipes pos={[5.95, 3.3, -42.8]} len={13} rotY={-Math.PI / 2} color="#2a7fc0" />
 
       {/* Your-name boxes */}
       <Crate id="boxL" pos={[-3, 3.4, -31.5]} label="CIAN" labelColor="#139aa8" />
@@ -160,6 +189,17 @@ function Room2() {
       <Tree pos={[-6, 2.4, -63]} />
       <Scaffold pos={[-9.5, -8, -56]} h={20} />
       <Beacon pos={[-4.5, 2.4, -53]} id="c2" />
+      {/* The sorting yard boom: two padded arms sweep the landing */}
+      <Sweeper pos={[0, 2.4, -60.6]} radius={5} speed={1.05} phase={1.2} />
+      <Sign pos={[-3.6, 4.6, -52.2]} rotY={0.4} text="Barredora" sub="saltad el brazo a tiempo" small />
+      <CargoStack pos={[6.4, 2.4, -65.2]} cols={2} layers={3} seed={11} />
+      <Container pos={[-6.6, 2.4, -55.2]} rotY={Math.PI / 2} color={CARGO[3]} />
+      <Fenders pos={[8.02, 2.4, -61]} rotY={Math.PI / 2} count={5} />
+      <Fenders pos={[-8.02, 2.4, -58]} rotY={-Math.PI / 2} count={5} />
+      <LampPost pos={[-7.3, 2.4, -66]} rotY={2.4} />
+      <LampPost pos={[7.3, 2.4, -51.2]} rotY={-0.7} />
+      <SteamVent pos={[-5.6, 2.4, -60]} every={2.7} />
+      <Flag pos={[-7.4, 2.4, -51.2]} color="#e8483b" h={5} />
     </>
   )
 }
@@ -194,9 +234,19 @@ function Room4() {
       {/* E: coupling yard */}
       <Block pos={[0, 2.4, -74]} size={[14, 10.4, 16]} />
       <CouplePlate id="r4plate" pos={[0, 2.42, -74]} yaw={Math.PI} />
-      <Sign pos={[4.8, 4.6, -71]} rotY={-0.4} text="Primer cuerpo" sub="mantened Y juntos" />
+      <Sign pos={[4.8, 4.6, -71]} rotY={-0.4} text="Primer cuerpo" sub="mantened Unir juntos" />
       <Tree pos={[-5.5, 2.4, -79]} s={1.2} />
       <Banner pos={[6.8, 5.6, -79]} rotY={-Math.PI / 2} />
+      <CargoStack pos={[5.2, 2.4, -79.6]} rotY={Math.PI / 2} cols={2} layers={2} seed={21} />
+      <Fenders pos={[7.02, 2.4, -72]} rotY={Math.PI / 2} count={4} />
+      <Fenders pos={[-7.02, 2.4, -72]} rotY={-Math.PI / 2} count={4} />
+      <LampPost pos={[-6.3, 2.4, -67]} rotY={2.2} />
+      <LampPost pos={[6.3, 2.4, -67]} rotY={-2.2} />
+      <Flag pos={[-6.4, 2.4, -81.2]} color="#22c7d6" h={4.6} />
+      <Flag pos={[6.4, 2.4, -81.2]} color="#ff9a1f" h={4.6} />
+      {/* Joined-body hazard: a crated load swinging across the walkway */}
+      <Pendulum pivot={[0, 9.4, -87.6]} floor={-9} length={5.8} amp={0.62} period={4.2} span={7.4} bias={[0, 0, 1]} bob={[1.5, 1.3, 1.5]} />
+      <Sign pos={[-3.4, 4.2, -83.2]} rotY={0.6} text="Carga suelta" sub="esperad a que pase" small />
       {/* F: walkway to learn walking with two legs */}
       <Block pos={[0, 2.4, -87]} size={[6, 10.4, 10]} />
       <Sign pos={[3.6, 4.4, -84]} rotY={-0.6} text="Unidos" sub="la dirección es la media" small />
@@ -223,6 +273,10 @@ function Room5() {
       <Block pos={[0, 3.4, -120.1]} size={[10, 11, 11.8]} />
       <Sign pos={[-4, 5.6, -116]} rotY={0.5} text="Pasamanos de grúas" sub="un brazo sujeta, el otro avanza" />
       <Scaffold pos={[5.5, 3.4, -121]} w={3} d={3} h={9} />
+      <CargoStack pos={[-3.6, 3.4, -123.6]} rotY={Math.PI / 2} cols={2} layers={2} seed={31} />
+      <Fenders pos={[-5.02, 3.4, -120]} rotY={-Math.PI / 2} count={4} />
+      <LampPost pos={[-4.4, 3.4, -114.8]} rotY={2.4} />
+      <SteamVent pos={[3.6, 3.4, -117.4]} every={3.6} offset={1} />
       {/* Seesaw over the void, with rings above both ends */}
       <Seesaw id="seesaw" pos={[0, 3.2, -131.4]} size={[3.5, 0.4, 10]} />
       <Ring id="r5_s1" pos={[-1.6, 9.2, -127.5]} mount="hang" mini={false} />
@@ -240,7 +294,51 @@ function Room5() {
       <Ring id="r5_slW" pos={[-1.9, 8.4, -159.6]} mount="hang" mini={false} sling={{ group: 'r5', to: V(0, 3.4, -170), time: 1.35 }} />
       <Ring id="r5_slE" pos={[1.9, 8.4, -159.6]} mount="hang" mini={false} sling={{ group: 'r5', to: V(0, 3.4, -170), time: 1.35 }} />
       <Scaffold pos={[0, 3.4, -159.6]} w={5.4} d={0.8} h={6.2} />
+      <Bollard pos={[2.5, 3.4, -153.4]} />
+      <Bollard pos={[-2.5, 3.4, -153.4]} />
       <Sign pos={[2.6, 5.6, -153.4]} rotY={-0.5} text="Tirachinas" sub="tensad y soltad a la vez" small />
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------------ */
+/* The docks keep working around you: cranes, cable cars, airships, gulls    */
+/* ------------------------------------------------------------------------ */
+
+/** Small floating rock with a steel pad: a crane's own island. */
+function CraneIsland({ pos }: { pos: [number, number, number] }) {
+  return (
+    <>
+      <Block pos={pos} size={[9, 5, 9]} tufts={18} noCollide />
+      <Pillar pos={[pos[0], pos[1] - 4.6, pos[2]]} radius={3.6} height={9} collide={false} />
+      <Pillar pos={[pos[0] + 1.2, pos[1] - 12, pos[2] - 0.8]} radius={1.8} height={8} collide={false} />
+      <Fenders pos={[pos[0], pos[1], pos[2] + 4.52]} count={4} />
+      <Fenders pos={[pos[0], pos[1], pos[2] - 4.52]} rotY={Math.PI} count={4} />
+    </>
+  )
+}
+
+function DockLife() {
+  return (
+    <>
+      <DockSkyline cx={6} cz={-95} inner={110} />
+      {/* Working cranes on their own floating decks, framing each room */}
+      <CraneIsland pos={[18, -4, -22]} />
+      <DockCrane pos={[18, -4, -22]} h={20} jib={15} rotY={2.6} phase={0} color={CARGO[0]} />
+      <CraneIsland pos={[-20, -6, -92]} />
+      <DockCrane pos={[-20, -6, -92]} h={24} jib={16} rotY={-0.4} phase={2.1} color={CARGO[1]} period={19} />
+      <CraneIsland pos={[19, -2, -128]} />
+      <DockCrane pos={[19, -2, -128]} h={22} jib={14} rotY={3.4} phase={4} color={CARGO[2]} period={14} />
+      <CraneIsland pos={[-24, -3, -176]} />
+      <DockCrane pos={[-24, -3, -176]} h={26} jib={17} rotY={0.3} phase={1} color={CARGO[4]} period={21} />
+      {/* Cable cars of parcels crossing high above the route */}
+      <CargoLine a={[-60, 22, -30]} b={[60, 26, -52]} count={5} speed={2.4} />
+      <CargoLine a={[55, 24, -100]} b={[-55, 21, -140]} count={4} speed={2} />
+      <Airship center={[6, -95]} rx={150} rz={190} y={44} speed={0.035} />
+      <Airship center={[6, -95]} rx={115} rz={140} y={30} speed={-0.05} phase={2.4} scale={0.7} />
+      <Gulls center={[0, 0, -38]} radius={20} y={13} />
+      <Gulls center={[4, 0, -128]} radius={26} y={18} count={10} />
+      <Gulls center={[0, 0, -180]} radius={22} y={20} count={8} />
     </>
   )
 }
@@ -260,6 +358,15 @@ function CrabArenaGeometry() {
       <Banner pos={[-6, 11, -189.2]} />
       <Banner pos={[6, 11, -189.2]} />
       <Sign pos={[-7, 7.8, -188]} text="Toma del fusible" small post={false} />
+      <Fenders pos={[14.02, 3.4, -172]} rotY={Math.PI / 2} count={6} />
+      <Fenders pos={[-14.02, 3.4, -172]} rotY={-Math.PI / 2} count={6} />
+      <Fenders pos={[14.02, 3.4, -183]} rotY={Math.PI / 2} count={5} />
+      <Fenders pos={[-14.02, 3.4, -183]} rotY={-Math.PI / 2} count={5} />
+      <LampPost pos={[13, 3.4, -165.8]} rotY={-2.4} h={4.4} />
+      <LampPost pos={[-13, 3.4, -165.8]} rotY={2.4} h={4.4} />
+      <Flag pos={[-12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
+      <Flag pos={[12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
+      <HazardEdge pos={[0, 3.4, -164.92]} len={28} />
       {/* Elevator to the garden (lights up at the end) */}
       <ElevatorDecor />
     </>

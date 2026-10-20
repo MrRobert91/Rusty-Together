@@ -167,3 +167,63 @@ export const iconTex = (glyph: string, color: string) => memo(`icon:${glyph}${co
   g.font = '800 72px Fredoka, system-ui, sans-serif'
   g.fillText(glyph, 64, 70)
 }, false))
+
+/**
+ * Shipping container face: corrugated ribs, a stencilled code, corner
+ * castings and the company chevron. One logo per face (box UVs 0..1).
+ */
+export const cargoTex = (color: string) => memo(`cargo:${color}`, () => canvas(256, 256, (g) => {
+  g.fillStyle = color
+  g.fillRect(0, 0, 256, 256)
+  // Corrugation.
+  for (let x = 0; x < 256; x += 16) {
+    g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x, 0, 5, 256)
+    g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(x + 9, 0, 4, 256)
+  }
+  // Wear and rust streaks.
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = `rgba(${rnd() < 0.5 ? '90,40,20' : '255,240,220'},${rnd() * 0.12})`
+    g.fillRect(rnd() * 256, rnd() * 256, 1 + rnd() * 3, 4 + rnd() * 26)
+  }
+  // Frame and corner castings.
+  g.strokeStyle = 'rgba(25,25,30,0.75)'; g.lineWidth = 12; g.strokeRect(6, 6, 244, 244)
+  g.fillStyle = '#2b2d33'
+  for (const [x, y] of [[0, 0], [228, 0], [0, 228], [228, 228]]) g.fillRect(x, y, 28, 28)
+  // Chevron logo in a white badge.
+  g.fillStyle = 'rgba(255,255,255,0.9)'
+  g.beginPath(); g.arc(128, 116, 44, 0, Math.PI * 2); g.fill()
+  g.fillStyle = color
+  g.beginPath(); g.moveTo(98, 136); g.lineTo(128, 86); g.lineTo(158, 136); g.lineTo(144, 136); g.lineTo(128, 108); g.lineTo(112, 136); g.fill()
+  // Stencil code.
+  g.fillStyle = 'rgba(255,255,255,0.85)'
+  g.font = '700 22px "Courier New", monospace'
+  g.textAlign = 'center'
+  g.fillText(`RBZ ${100 + Math.floor(rnd() * 899)}·${Math.floor(rnd() * 9)}`, 128, 196)
+  g.fillRect(70, 206, 116, 3)
+}, false))
+
+/** Painted dock deck edge: worn yellow/black chevrons on steel. */
+export const edgeTex = () => memo('edge', () => canvas(128, 32, (g) => {
+  g.fillStyle = '#ffc21a'
+  g.fillRect(0, 0, 128, 32)
+  g.fillStyle = '#1f2026'
+  for (let i = -32; i < 160; i += 24) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 12, 0); g.lineTo(i - 4, 32); g.lineTo(i - 16, 32); g.fill() }
+  for (let i = 0; i < 120; i++) { g.fillStyle = `rgba(60,50,40,${rnd() * 0.25})`; g.fillRect(rnd() * 128, rnd() * 32, 1 + rnd() * 4, 1 + rnd() * 2) }
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 28, 128, 4)
+}))
+
+/** Striped envelope for the airships. */
+export const blimpTex = () => memo('blimp', () => canvas(256, 128, (g) => {
+  g.fillStyle = '#efe4cc'
+  g.fillRect(0, 0, 256, 128)
+  g.fillStyle = '#e8572e'
+  for (let x = 0; x < 256; x += 64) g.fillRect(x, 0, 30, 128)
+  g.fillStyle = 'rgba(0,0,0,0.08)'
+  for (let y = 0; y < 128; y += 8) g.fillRect(0, y, 256, 1)
+  g.fillStyle = '#2d3340'
+  g.fillRect(0, 56, 256, 16)
+  g.fillStyle = '#ffc21a'
+  g.font = '800 14px Fredoka, system-ui, sans-serif'
+  g.textAlign = 'center'
+  for (let x = 32; x < 256; x += 128) g.fillText('ROBOZ EXPRESS', x + 32, 69)
+}))
