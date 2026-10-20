@@ -4,7 +4,7 @@ import { Environment, Lightformer } from '@react-three/drei'
 import * as THREE from 'three'
 import { G } from '../runtime'
 import { puffTex, strataTex, grassTex } from './textures'
-import { settings } from '../../core/settings'
+import { usePerf, tier } from '../../core/device'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 const SUN = new THREE.Vector3(60, 80, 40)
@@ -16,7 +16,8 @@ export const backdropCfg = { cx: 0, cz: -60, inner: 85 }
 export function Atmosphere() {
   const light = useRef<THREE.DirectionalLight>(null!)
   const scene = useThree((s) => s.scene)
-  const high = settings().quality === 'high'
+  const t = usePerf((s) => s.tier)
+  const high = useMemo(() => tier() === 'high', [])
 
   useMemo(() => {
     scene.fog = new THREE.Fog('#c4e2fa', 110, 560)
@@ -40,7 +41,7 @@ export function Atmosphere() {
         ref={light}
         color="#fff0d6"
         intensity={2.6}
-        castShadow
+        castShadow={t !== 'low'}
         shadow-mapSize={high ? [2048, 2048] : [1024, 1024]}
         shadow-camera-left={-28}
         shadow-camera-right={28}
@@ -57,14 +58,14 @@ export function Atmosphere() {
         <Lightformer form="rect" intensity={0.8} color="#d98a5c" position={[0, -8, 0]} rotation-x={-Math.PI / 2} scale={[40, 40, 1]} />
         <Lightformer form="ring" intensity={3} color="#ffffff" position={[-15, 8, -15]} scale={6} target={[0, 0, 0]} />
       </Environment>
-      <CloudSea />
+      <CloudSea count={t === 'low' ? 90 : t === 'medium' ? 170 : 260} />
       <Backdrop />
     </>
   )
 }
 
 /** Billboard cloud puffs: a sea below the floating city and a few drifting banks. */
-function CloudSea() {
+function CloudSea({ count }: { count: number }) {
   const mesh = useRef<THREE.InstancedMesh>(null!)
   const N = 260
   const data = useMemo(() => {
@@ -86,7 +87,8 @@ function CloudSea() {
   const camera = useThree((s) => s.camera)
   useFrame((_, dt) => {
     const m = mesh.current
-    for (let i = 0; i < N; i++) {
+    m.count = count
+    for (let i = 0; i < count; i++) {
       const d = data[i]
       d.p.x += d.speed * dt
       if (d.p.x > 340) d.p.x -= 600

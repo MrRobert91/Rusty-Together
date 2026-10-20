@@ -14,11 +14,15 @@ export interface Settings {
   assist: boolean
   reduceShake: boolean
   reduceFlashes: boolean
-  quality: 'high' | 'low'
+  quality: 'auto' | 'high' | 'medium' | 'low'
   grabToggle: boolean
   pushToTalk: boolean
   micDeviceId: string
   showFps: boolean
+  touchSensitivity: number
+  /** On-screen button scale (0.85–1.25). */
+  touchScale: number
+  haptics: boolean
   set: (patch: Partial<Settings>) => void
 }
 
@@ -36,14 +40,17 @@ export const useSettings = create<Settings>()(
       assist: false,
       reduceShake: false,
       reduceFlashes: false,
-      quality: 'high',
+      quality: 'auto',
       grabToggle: false,
       pushToTalk: false,
       micDeviceId: '',
       showFps: false,
+      touchSensitivity: 1,
+      touchScale: 1,
+      haptics: true,
       set: (patch) => set(patch),
     }),
-    { name: 'rusty-together-settings', version: 1 },
+    { name: 'rusty-together-settings', version: 3, migrate: (s: any, v) => ({ touchSensitivity: 1, touchScale: 1, haptics: true, ...s, ...(v < 2 ? { quality: 'auto' } : {}) }) },
   ),
 )
 

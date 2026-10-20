@@ -8,6 +8,7 @@ import {
 } from 'three.quarks'
 import { onFx } from '../runtime'
 import { settings } from '../../core/settings'
+import { tier } from '../../core/device'
 
 /**
  * Particle effects powered by three.quarks. Each effect is a small pool of
@@ -201,7 +202,7 @@ export function Particles() {
     }))
 
     const spawn = (name: FxName, p: { x: number; y: number; z: number }, color?: string, dir?: { x: number; y: number; z: number }, scale = 1) => {
-      if (settings().quality === 'low' && (name === 'step' || name === 'trail')) return
+      if (tier() === 'low' && (name === 'step' || name === 'trail')) return
       if (settings().reduceFlashes && (name === 'burst' || name === 'merge')) scale *= 0.6
       const pool = pools.get(name)
       if (!pool) return

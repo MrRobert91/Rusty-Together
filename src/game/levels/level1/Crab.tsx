@@ -8,6 +8,7 @@ import { hostSet } from '../../net/replication'
 import { envMat, worldBox } from '../../env/blocks'
 import { Conveyor, CouplePlate } from '../../env/interactive'
 import { GEO, M } from '../../robots/materials'
+import { useRigMerge } from '../../perf/StaticBatch'
 import { VisorFace } from '../../robots/eyes'
 import { BIG, MINI, COLORS } from '../../tuning'
 import { applyHit } from '../../robots/miniController'
@@ -396,6 +397,7 @@ export function crabPos(phase: string | undefined, t0: number | undefined) {
 
 function CrabModel() {
   const root = useRef<THREE.Group>(null!)
+  useRigMerge(root, M.rigVC())
   const body = useRef<THREE.Group>(null!)
   const claws = { W: useRef<THREE.Group>(null!), E: useRef<THREE.Group>(null!) }
   const pincers = { W: useRef<THREE.Group>(null!), E: useRef<THREE.Group>(null!) }

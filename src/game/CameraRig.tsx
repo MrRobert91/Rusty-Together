@@ -91,7 +91,7 @@ export function CameraRig() {
       const moving = Math.hypot(me.vel.x, me.vel.z) > 1
       if (Math.abs(lx) + Math.abs(ly) > 0.0005) s.idle = 0
       else s.idle += dt
-      if (moving && s.idle > 1.4 && me.cable.state === 'idle') {
+      if (moving && s.idle > (human.frame.device === 'touch' ? 0.8 : 1.4) && me.cable.state === 'idle') {
         C.yaw = dampAngle(C.yaw, me.yaw + Math.PI, 0.9, dt)
         C.pitch = damp(C.pitch, 0.3, 0.6, dt)
       }

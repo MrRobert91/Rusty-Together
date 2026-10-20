@@ -8,7 +8,8 @@ import { stopVoice, startVoice, voiceLobbyMode } from '../net/voice'
 import { useSettings } from '../core/settings'
 import { TitleScreen, MainMenu, JoinScreen } from './Menus'
 import { Lobby } from './Lobby'
-import { Hud } from './Hud'
+import { Hud, useDevice } from './Hud'
+import { TouchControls, RotateHint } from './TouchControls'
 import { PauseMenu } from './PauseMenu'
 import { SettingsPanel, ControlsPanel } from './Settings'
 import { MenuBackdrop } from './MenuBackdrop'
@@ -57,6 +58,7 @@ export function App() {
   const runId = useApp((s) => s.runId)
   const settingsOpen = useApp((s) => s.settingsOpen)
   const controlsOpen = useApp((s) => s.controlsOpen)
+  const device = useDevice()
 
   // Lobby events → screens.
   useEffect(() => {
@@ -86,11 +88,13 @@ export function App() {
 
   const inGame = screen === 'game' && session
   return (
-    <div className="app">
+    <div className={`app dev-${device}`}>
       {!inGame && <MenuBackdrop />}
       {inGame && <Game key={runId} level={level} session={session} />}
       {inGame && <Hud />}
+      {inGame && device === 'touch' && <TouchControls />}
       {inGame && <PauseMenu />}
+      {inGame && device === 'touch' && <RotateHint />}
       {screen === 'title' && <TitleScreen onStart={() => { initAudio(); setMusic('menu'); sfx('go'); useApp.getState().set({ screen: 'menu' }) }} />}
       {screen === 'menu' && <MainMenu />}
       {screen === 'join' && <JoinScreen />}

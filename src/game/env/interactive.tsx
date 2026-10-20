@@ -8,6 +8,7 @@ import { plates } from '../Simulation'
 import { envMat, worldBox, type V3 } from './blocks'
 import { beltTex, signTex } from './textures'
 import { GEO, M } from '../robots/materials'
+import { useRigMerge } from '../perf/StaticBatch'
 import { BIG, COLORS, MINI, SLOT_COLOR } from '../tuning'
 import { fx } from '../runtime'
 
@@ -53,9 +54,7 @@ export function Ring({ id, pos, mount = 'post', mini = true, big = true, sling, 
   const halo = [useRef<THREE.Mesh>(null!), useRef<THREE.Mesh>(null!)]
   const s = scale * (sling ? 1.3 : 1)
   useFrame((_, dt) => {
-    if (enabledVar) anchor.enabled = !!G.vars[enabledVar]
-    ring.current.visible = anchor.enabled
-    ring.current.rotation.y = facing + Math.sin(G.time * 1.3 + pos[0]) * 0.12
+    if (enabledVar) { anchor.enabled = !!G.vars[enabledVar]; ring.current.visible = anchor.enabled }
     for (let i = 0; i < 2; i++) {
       const hot = G.time - anchor.hot[i] < 0.12
       const h = halo[i].current
@@ -65,29 +64,32 @@ export function Ring({ id, pos, mount = 'post', mini = true, big = true, sling, 
   })
   return (
     <group position={pos}>
-      <group ref={ring}>
+      {/* Static body of the ring: baked by the static batcher. */}
+      <group ref={ring} rotation-y={facing} userData={enabledVar ? { noBatch: true } : { batch: true }}>
         <mesh geometry={GEO.torus()} material={M.glow(sling ? '#ffcf3a' : '#ffbe2e', sling ? 1.2 : 0.7)} scale={0.48 * s} castShadow />
         <mesh geometry={GEO.torus()} material={M.chrome()} scale={[0.56 * s, 0.56 * s, 0.4 * s]} />
         {[0, 1, 2, 3].map((k) => (
           <mesh key={k} geometry={GEO.box()} material={envMat('dark')} position={[Math.cos((k * Math.PI) / 2) * 0.48 * s, Math.sin((k * Math.PI) / 2) * 0.48 * s, 0]} rotation-z={(k * Math.PI) / 2} scale={[0.1 * s, 0.16 * s, 0.14 * s]} />
         ))}
+        {mount === 'post' && (
+          <>
+            <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={-(pos[1] > 0 ? Math.min(pos[1], 4) : 2) / 2 - 0.5 * s} scale={[0.09, pos[1] > 0 ? Math.min(pos[1], 4) : 2, 0.09]} castShadow />
+            <mesh geometry={GEO.box()} material={envMat('yellow')} position-y={-0.55 * s} scale={[0.3, 0.14, 0.3]} />
+          </>
+        )}
+        {mount === 'hang' && (
+          <>
+            <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={0.5 * s + 1.5} scale={[0.04, 3, 0.04]} />
+            <mesh geometry={GEO.box()} material={envMat('yellow')} position-y={0.55 * s} scale={[0.25, 0.14, 0.25]} />
+          </>
+        )}
+        {mount === 'wall' && <mesh geometry={GEO.box()} material={envMat('dark')} position-z={-0.4} scale={[0.3, 0.3, 0.6]} />}
+      </group>
+      <group rotation-y={facing}>
         {[0, 1].map((i) => (
           <mesh key={i} ref={halo[i]} geometry={GEO.ringFlat()} material={M.basic(SLOT_COLOR[i], 0.85)} visible={false} />
         ))}
       </group>
-      {mount === 'post' && (
-        <>
-          <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={-(pos[1] > 0 ? Math.min(pos[1], 4) : 2) / 2 - 0.5 * s} scale={[0.09, pos[1] > 0 ? Math.min(pos[1], 4) : 2, 0.09]} castShadow />
-          <mesh geometry={GEO.box()} material={envMat('yellow')} position-y={-0.55 * s} scale={[0.3, 0.14, 0.3]} />
-        </>
-      )}
-      {mount === 'hang' && (
-        <>
-          <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={0.5 * s + 1.5} scale={[0.04, 3, 0.04]} />
-          <mesh geometry={GEO.box()} material={envMat('yellow')} position-y={0.55 * s} scale={[0.25, 0.14, 0.25]} />
-        </>
-      )}
-      {mount === 'wall' && <mesh geometry={GEO.box()} material={envMat('dark')} position-z={-0.4} scale={[0.3, 0.3, 0.6]} />}
     </group>
   )
 }
@@ -117,10 +119,13 @@ export function Crate({ id, pos, size = 0.85, label, labelColor, killY = -20 }: 
       fx('sfx', { n: 'pop', p: home })
     }
   })
+  const parts = useRef<THREE.Group>(null)
+  useRigMerge(parts)
   const labelTex = useMemo(() => (label ? signTex(label, '', labelColor ?? '#2d3340', '#fff', '#fff') : null), [label, labelColor])
   return (
     <RigidBody ref={body} type={host ? 'dynamic' : 'kinematicPosition'} position={pos} colliders={false} mass={6} linearDamping={0.4} angularDamping={0.8} userData={{ crate: id }} ccd>
       <CuboidCollider args={[size / 2, size / 2, size / 2]} friction={0.7} restitution={0.05} />
+      <group ref={parts}>
       <mesh geometry={worldBox(size, size, size, size)} material={envMat('wood')} castShadow receiveShadow />
       {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z], i) => (
         <mesh key={i} geometry={GEO.box()} material={envMat('dark')} position={[(x * size) / 2, 0, (z * size) / 2]} scale={[0.1, size + 0.02, 0.1]} />
@@ -131,6 +136,7 @@ export function Crate({ id, pos, size = 0.85, label, labelColor, killY = -20 }: 
           <mesh position-z={-size / 2 - 0.01} rotation-y={Math.PI} scale={[size * 0.8, size * 0.4, 1]}><planeGeometry /><meshBasicMaterial map={labelTex} /></mesh>
         </>
       )}
+      </group>
     </RigidBody>
   )
 }
@@ -154,7 +160,7 @@ export function Conveyor({ pos, size, dir, speed, speedVar, rotY = 0 }: { pos: V
     tex.rotation = 0
   })
   return (
-    <group position={pos} rotation-y={rotY}>
+    <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
       <RigidBody type="fixed" colliders={false} userData={{ conveyor: [dir[0] * speed, 0, dir[1] * speed], speedVar }}>
         <CuboidCollider args={[w / 2, 0.15, d / 2]} position={[0, -0.15, 0]} friction={0.8} />
       </RigidBody>
@@ -195,7 +201,7 @@ export function Gate({ pos, size, openVar, rotY = 0, invert = false, color = '#f
         <mesh geometry={worldBox(w * 0.9, 0.3, d + 0.04, 1)} material={envMat('hazard')} position-y={h - 0.25} />
         <mesh geometry={GEO.box()} material={M.accent(color)} position-y={h * 0.5} scale={[w * 0.5, 0.18, d + 0.06]} />
       </RigidBody>
-      <group position={pos} rotation-y={rotY}>
+      <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
         {[-1, 1].map((s) => <mesh key={s} geometry={worldBox(0.35, h + 0.6, d + 0.3, 2)} material={envMat('dark')} position={[(s * (w + 0.35)) / 2, (h + 0.6) / 2 - 0.3, 0]} castShadow />)}
         <mesh geometry={worldBox(w + 0.7, 0.35, d + 0.3, 2)} material={envMat('dark')} position-y={h + 0.3} castShadow />
         <mesh ref={light} geometry={GEO.sphereLo()} material={M.basic('#ff5a3a').clone()} position={[0, h + 0.55, 0]} scale={0.16} />
@@ -240,7 +246,7 @@ export function Switch({ id, pos, radius = 0.8, color = '#f2b51d', latch = false
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.4 }), [color])
   return (
     <group position={pos}>
-      <mesh geometry={GEO.cyl()} material={envMat('dark')} scale={[radius + 0.15, 0.12, radius + 0.15]} position-y={0.03} receiveShadow />
+      <mesh geometry={GEO.cyl()} material={envMat('dark')} scale={[radius + 0.15, 0.12, radius + 0.15]} position-y={0.03} receiveShadow userData={{ batch: true }} />
       <mesh ref={cap} geometry={GEO.cyl()} material={mat} scale={[radius, 0.14, radius]} castShadow />
       {label && <Sign pos={[0, 1.6, -radius - 0.2]} text={label} small />}
     </group>
@@ -263,7 +269,7 @@ export function SafetyNet({ pos, size, returnTo }: { pos: V3; size: [number, num
   const lines = useRef<THREE.LineSegments>(null!)
   useFrame(() => { lines.current.position.y = Math.sin(G.time * 2) * 0.03 })
   return (
-    <group position={pos}>
+    <group position={pos} userData={{ batch: true }}>
       <RigidBody type="fixed" colliders={false} userData={{ net: returnTo }}>
         <CuboidCollider args={[w / 2, 0.1, d / 2]} position={[0, -0.1, 0]} />
       </RigidBody>
@@ -295,8 +301,8 @@ export function SpringPad({ pos, bounce = 15, rotY = 0 }: { pos: V3; bounce?: nu
       <RigidBody type="fixed" colliders={false} userData={{ bounce }}>
         <CylinderCollider args={[0.15, 0.9]} position={[0, 0.15, 0]} />
       </RigidBody>
-      <mesh geometry={GEO.cyl()} material={envMat('dark')} scale={[0.95, 0.2, 0.95]} position-y={0.05} />
-      <mesh geometry={GEO.torus()} material={envMat('yellow')} rotation-x={Math.PI / 2} scale={[0.6, 0.6, 1.6]} position-y={0.17} />
+      <mesh geometry={GEO.cyl()} material={envMat('dark')} scale={[0.95, 0.2, 0.95]} position-y={0.05} userData={{ batch: true }} />
+      <mesh geometry={GEO.torus()} material={envMat('yellow')} rotation-x={Math.PI / 2} scale={[0.6, 0.6, 1.6]} position-y={0.17} userData={{ batch: true }} />
       <group ref={top}>
         <mesh geometry={GEO.cyl()} material={envMat('pad')} scale={[0.9, 0.08, 0.9]} castShadow />
         <mesh geometry={GEO.ringFlat()} material={M.glow('#ffd23a', 1.5)} rotation-x={-Math.PI / 2} position-y={0.05} scale={0.6} />
@@ -334,8 +340,8 @@ export function CouplePlate({ id, pos, yaw = 0, radius = 2.4, enabledVar }: { id
   const coreMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#bdf6ff', emissiveIntensity: 1, roughness: 0.3 }), [])
   return (
     <group position={pos} rotation-y={yaw}>
-      <mesh geometry={GEO.cyl()} material={envMat('plate')} scale={[radius, 0.12, radius]} position-y={0.0} receiveShadow />
-      <mesh geometry={GEO.torus()} material={envMat('yellow')} rotation-x={Math.PI / 2} scale={[radius, radius, 0.8]} position-y={0.06} />
+      <mesh geometry={GEO.cyl()} material={envMat('plate')} scale={[radius, 0.12, radius]} position-y={0.0} receiveShadow userData={{ batch: true }} />
+      <mesh geometry={GEO.torus()} material={envMat('yellow')} rotation-x={Math.PI / 2} scale={[radius, radius, 0.8]} position-y={0.06} userData={{ batch: true }} />
       <mesh ref={core} geometry={GEO.cyl()} material={coreMat} scale={[0.35, 0.1, 0.35]} position-y={0.08} />
       {[0, 1].map((i) => (
         <mesh key={i} ref={rings[i]} geometry={GEO.ringFlat()} rotation-x={-Math.PI / 2} position-y={0.075} material={new THREE.MeshBasicMaterial({ color: SLOT_COLOR[i], transparent: true, opacity: 0.3, toneMapped: false })} />
@@ -357,7 +363,7 @@ export function Sign({ pos, rotY = 0, text, sub = '', small = false, post = true
   const tex = useMemo(() => signTex(text, sub, bg), [text, sub, bg])
   const s = small ? 0.6 : 1
   return (
-    <group position={pos} rotation-y={rotY}>
+    <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
       <mesh scale={[2.6 * s, 1.3 * s, 1]} castShadow><planeGeometry /><meshStandardMaterial map={tex} roughness={0.6} /></mesh>
       <mesh position-z={-0.03} scale={[2.75 * s, 1.45 * s, 0.05]} material={envMat('dark')} geometry={GEO.box()} />
       {post && <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={-1.2 * s} scale={[0.06, 1.8 * s, 0.06]} />}
@@ -394,7 +400,7 @@ export function Beacon({ pos, id }: { pos: V3; id: string }) {
   })
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#7dffb0', emissive: '#41ff8a', emissiveIntensity: 0.2, toneMapped: false }), [])
   return (
-    <group position={pos}>
+    <group position={pos} userData={{ batch: true }}>
       <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={0.6} scale={[0.07, 1.2, 0.07]} castShadow />
       <mesh ref={lamp} geometry={GEO.sphereLo()} material={mat} position-y={1.3} scale={0.16} />
       <mesh geometry={GEO.cyl()} material={envMat('yellow')} position-y={0.05} scale={[0.25, 0.1, 0.25]} />

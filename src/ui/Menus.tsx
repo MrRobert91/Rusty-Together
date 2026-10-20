@@ -6,7 +6,7 @@ import { sfx } from '../core/audio'
 import { useSettings } from '../core/settings'
 import { startVoice } from '../net/voice'
 import { CODE_LENGTH, normalizeCode } from '../../shared/protocol'
-import { getPad } from '../core/input'
+import { currentDevice, getPad } from '../core/input'
 
 /** Gamepad navigation for any menu: D-pad/stick moves focus, A clicks, B goes back. */
 export function useMenuPad(onBack?: () => void) {
@@ -84,10 +84,12 @@ export function Logo({ small }: { small?: boolean }) {
 }
 
 export function TitleScreen({ onStart }: { onStart: () => void }) {
+  const touchFirst = currentDevice() === 'touch'
   useEffect(() => {
     const go = (e: Event) => { if ((e as KeyboardEvent).key === 'Tab') return; onStart() }
     window.addEventListener('keydown', go, { once: true })
-    window.addEventListener('pointerdown', go, { once: true })
+    // Start on click (not pointerdown) so the same tap can't land on the menu underneath.
+    window.addEventListener('click', go, { once: true })
     let raf = 0
     const poll = () => {
       const p = getPad()
@@ -95,14 +97,14 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       raf = requestAnimationFrame(poll)
     }
     raf = requestAnimationFrame(poll)
-    return () => { window.removeEventListener('keydown', go); window.removeEventListener('pointerdown', go); cancelAnimationFrame(raf) }
+    return () => { window.removeEventListener('keydown', go); window.removeEventListener('click', go); cancelAnimationFrame(raf) }
   }, [onStart])
   return (
     <div className="screen title-screen">
       <Logo />
       <p className="tagline">Dos robots. Un cuerpo. Ningún acuerdo sobre dónde poner el pie.</p>
-      <div className="press-any">Pulsa cualquier tecla o botón</div>
-      <div className="title-foot">Cooperativo online para 2 · Chat de voz de proximidad · Mando recomendado</div>
+      <div className="press-any">{touchFirst ? 'Toca para empezar' : 'Pulsa cualquier tecla o botón'}</div>
+      <div className="title-foot">Cooperativo online para 2 · Chat de voz de proximidad · {touchFirst ? 'Juega en horizontal' : 'Mando recomendado'}</div>
     </div>
   )
 }
@@ -115,7 +117,8 @@ export function MainMenu() {
   const [busy, setBusy] = useState(false)
   useMenuPad()
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => { ref.current?.querySelector<HTMLElement>('[data-nav]')?.focus() }, [])
+  // Phones: don't pop the keyboard by focusing the name field.
+  useEffect(() => { if (currentDevice() !== 'touch') ref.current?.querySelector<HTMLElement>('[data-nav]')?.focus() }, [])
 
   const host = async () => {
     setBusy(true)

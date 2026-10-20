@@ -7,7 +7,7 @@ import type { World } from '@dimforge/rapier3d-compat'
 import {
   G, act, camRelative, clamp, fx, isHost, localMini, localSlot, onAct, peerMini, peerSlot, type Mini,
 } from './runtime'
-import { consumeHuman, newStepInput, pollHuman, clearEdges, type StepInput } from './control'
+import { consumeHuman, newStepInput, pollHuman, clearEdges, human, type StepInput } from './control'
 import { applyHit, carryPoint, respawnMini, stepMini } from './robots/miniController'
 import { bigWantsSplit, newPilotFrame, resetBigLocals, stepBig, type PilotFrame } from './robots/bigController'
 import {
@@ -222,7 +222,8 @@ export function Simulation() {
         G.big.body?.setNextKinematicTranslation({ x: G.big.pos.x, y: G.big.pos.y, z: G.big.pos.z })
       }
       if (G.form === 'joined') {
-        if (localIn.pressed.jump) s.send('pj', { t: G.time })
+        // Instant local feedback; the host resolves the joint window fairly.
+        if (localIn.pressed.jump) { s.send('pj', { t: G.time }); G.big.ready[localSlot()] = 1; sfx(localSlot() === 0 ? 'beepCyan' : 'beepAmber', G.big.pos, 0.6) }
         if (localIn.pressed.primary) s.send('px', { t: G.time })
       }
     }
@@ -245,12 +246,20 @@ export function Simulation() {
       s.send('world', encodeWorld(acc.world))
       acc.world = 0
     }
-    if (!s.isHost && G.form === 'joined' && acc.intent >= 1 / NET.poseHz) {
-      acc.intent = 0
+    if (!s.isHost && G.form === 'joined') {
+      // Send the moment intent changes (plus a heartbeat): no tick wait.
       const h = localIn
-      const mv = camRelative(h.stick, G.cam.yaw, tmp2)
+      const mv = camRelative(human.frame.move, G.cam.yaw, tmp2)
       const aim = pilotAim(tmp)
-      s.send('in', { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], b: h.held.brake ? 1 : 0, c: h.held.couple ? 1 : 0, g: h.held.grab ? 1 : 0, r: h.held.secondary ? 1 : 0 })
+      const f = human.frame.held
+      const msg = { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], b: f.brake ? 1 : 0, c: f.couple ? 1 : 0, g: f.grab ? 1 : 0, r: f.secondary ? 1 : 0 }
+      const key = JSON.stringify(msg)
+      if (key !== lastIntent || acc.intent >= 1 / NET.poseHz) {
+        acc.intent = 0
+        lastIntent = key
+        s.send('in', msg)
+      }
+      void h
     }
   })
 
@@ -258,6 +267,7 @@ export function Simulation() {
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100
+let lastIntent = ''
 
 /* ---------------------------------------------------------------- Forms */
 

@@ -4,12 +4,12 @@ import { G } from '../game/runtime'
 import { useApp } from './appStore'
 import { backToMenu, startSolo } from './App'
 import { MenuButton, useMenuPad } from './Menus'
-import { getPad, setInputEnabled } from '../core/input'
+import { currentDevice, getPad, setInputEnabled } from '../core/input'
 import { lobbySend } from '../net/online'
 import { reachCheckpoint } from '../game/levels/checkpoints'
 import { killMini } from '../game/robots/miniController'
 
-function setPaused(on: boolean, broadcast = true) {
+export function setPaused(on: boolean, broadcast = true) {
   G.paused = on
   useHud.setState({ paused: on })
   setInputEnabled(!on)
@@ -17,7 +17,7 @@ function setPaused(on: boolean, broadcast = true) {
   if (broadcast && G.session?.mode === 'online') G.session.send('pause', { on })
   if (!on) {
     const c = document.querySelector('canvas')
-    if (c && !document.pointerLockElement) c.requestPointerLock?.()
+    if (c && !document.pointerLockElement && currentDevice() !== 'touch') c.requestPointerLock?.()
   }
 }
 

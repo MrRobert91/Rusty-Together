@@ -63,8 +63,7 @@ export const BIG = {
 
 export const NET = {
   poseHz: 30,
-  worldHz: 20,
-  interpDelay: 0.1,
+  worldHz: 30,
 }
 
 export const COLORS = {

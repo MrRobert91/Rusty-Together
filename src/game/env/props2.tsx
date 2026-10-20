@@ -67,13 +67,15 @@ export function Bell({ id, pos }: { id: string; pos: V3 }) {
   })
   return (
     <group position={pos}>
-      <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={1.1} scale={[0.08, 2.2, 0.08]} castShadow />
-      <mesh geometry={worldBox(0.9, 0.1, 0.1)} material={envMat('yellow')} position-y={2.55} />
+      <group userData={{ batch: true }}>
+        <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={1.1} scale={[0.08, 2.2, 0.08]} castShadow />
+        <mesh geometry={worldBox(0.9, 0.1, 0.1)} material={envMat('yellow')} position-y={2.55} />
+      </group>
       <group ref={bell} position-y={2.5}>
         <mesh material={mat} geometry={bellGeo()} position-y={-0.62} castShadow />
         <mesh material={mat} position-y={-0.08} geometry={GEO.sphere()} scale={[0.15, 0.1, 0.15]} />
       </group>
-      <mesh geometry={GEO.cyl()} material={envMat('orange')} scale={[0.45, 0.12, 0.45]} position-y={0.06} />
+      <mesh geometry={GEO.cyl()} material={envMat('orange')} scale={[0.45, 0.12, 0.45]} position-y={0.06} userData={{ batch: true }} />
     </group>
   )
 }
@@ -139,7 +141,7 @@ export function Seesaw({ id, pos, size, limit = 0.32 }: { id: string; pos: V3; s
         {[-1, 1].map((s) => <mesh key={s} geometry={worldBox(0.2, h + 0.12, d, 2)} material={envMat('yellow')} position={[(s * w) / 2, 0.02, 0]} castShadow />)}
         {[-1, 1].map((s) => <mesh key={'e' + s} geometry={worldBox(w, h + 0.1, 0.25, 1)} material={envMat('hazard')} position={[0, 0.02, (s * (d - 0.3)) / 2]} />)}
       </RigidBody>
-      <group position={pos}>
+      <group position={pos} userData={{ batch: true }}>
         <mesh geometry={GEO.cyl()} material={envMat('dark')} rotation-z={Math.PI / 2} scale={[0.35, w + 0.6, 0.35]} />
         {[-1, 1].map((s) => (
           <mesh key={s} geometry={worldBox(0.4, 6, 0.8)} material={envMat('dark')} position={[(s * (w + 0.8)) / 2, -3, 0]} castShadow />
@@ -156,8 +158,10 @@ export function Wall({ pos, size, kind = 'metal', rotY = 0 }: { pos: V3; size: V
   return (
     <RigidBody type="fixed" position={pos} rotation-y={rotY} colliders={false}>
       <CuboidCollider args={[w / 2, h / 2, d / 2]} position={[0, h / 2, 0]} />
-      <mesh geometry={worldBox(w, h, d, 2)} material={envMat(kind)} position-y={h / 2} castShadow receiveShadow />
-      <mesh geometry={worldBox(w + 0.06, 0.14, d + 0.06, 1)} material={envMat('yellow')} position-y={h} />
+      <group userData={{ batch: true }}>
+        <mesh geometry={worldBox(w, h, d, 2)} material={envMat(kind)} position-y={h / 2} castShadow receiveShadow />
+        <mesh geometry={worldBox(w + 0.06, 0.14, d + 0.06, 1)} material={envMat('yellow')} position-y={h} />
+      </group>
     </RigidBody>
   )
 }
@@ -167,8 +171,10 @@ export function Glass({ pos, size, rotY = 0 }: { pos: V3; size: V3; rotY?: numbe
   return (
     <RigidBody type="fixed" position={pos} rotation-y={rotY} colliders={false}>
       <CuboidCollider args={[w / 2, h / 2, d / 2]} position={[0, h / 2, 0]} />
-      <mesh geometry={worldBox(w, h, d, 2)} material={envMat('glass')} position-y={h / 2} />
-      <mesh geometry={worldBox(w, 0.08, d + 0.04, 1)} material={envMat('dark')} position-y={h} />
+      <group userData={{ batch: true }}>
+        <mesh geometry={worldBox(w, h, d, 2)} material={envMat('glass')} position-y={h / 2} />
+        <mesh geometry={worldBox(w, 0.08, d + 0.04, 1)} material={envMat('dark')} position-y={h} />
+      </group>
     </RigidBody>
   )
 }
@@ -179,7 +185,7 @@ export function CraneBeam({ from, to, y }: { from: [number, number]; to: [number
   const ang = Math.atan2(to[0] - from[0], to[1] - from[1])
   const mid: V3 = [(from[0] + to[0]) / 2, y, (from[1] + to[1]) / 2]
   return (
-    <group position={mid} rotation-y={ang}>
+    <group position={mid} rotation-y={ang} userData={{ batch: true }}>
       <mesh geometry={worldBox(0.6, 0.7, len, 2)} material={envMat('yellow')} castShadow />
       <mesh geometry={worldBox(0.7, 0.12, len, 2)} material={envMat('dark')} position-y={-0.4} />
       {Array.from({ length: Math.floor(len / 2) }, (_, i) => (

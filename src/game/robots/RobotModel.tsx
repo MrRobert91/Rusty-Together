@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { mergeRig } from '../perf/StaticBatch'
+import { tier } from '../../core/device'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GEO, M } from './materials'
@@ -95,12 +97,16 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
   const knee = [useRef<THREE.Group>(null!), useRef<THREE.Group>(null!)]
   const boot = [useRef<THREE.Group>(null!), useRef<THREE.Group>(null!)]
   const chestLight = useRef<THREE.Mesh>(null!)
+  const blob = useRef<THREE.Mesh>(null!)
 
   const st = useRef({
     phase: 0, speed: 0, yaw: view.yaw, lean: 0, side: 0, blinkAt: 1 + Math.random() * 3, blinkUntil: 0,
     antX: [new Spring(), new Spring()], antZ: [new Spring(), new Spring()], prevVel: new THREE.Vector3(), accel: new THREE.Vector3(),
     stepSide: 0, crouch: 0, offer: 0, hang: 0, carry: 0, armBlend: [0, 0], lookX: 0, lookY: 0, torsion: 0,
   })
+
+  // Bake sibling parts per joint into single meshes (fewer draw calls).
+  useLayoutEffect(() => { if (root.current) mergeRig(root.current, M.rigVC()) }, [])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20)
@@ -129,6 +135,7 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
     s.phase += dt * (big ? 5.2 : 9.5) * Math.max(0.25, k) * (s.speed > 0.15 ? 1 : 0)
 
     r.rotation.y = s.yaw
+    blob.current.visible = tier() === 'low' && v.grounded
     r.getWorldPosition(v.rootWorld)
 
     // Squash & stretch from landing / jumping.
@@ -260,7 +267,7 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
   return (
     <group ref={root} scale={S}>
       {/* contact shadow blob */}
-      <mesh rotation-x={-Math.PI / 2} position-y={0.01} geometry={GEO.ringFlat()} scale={0.22} material={M.basic('#000000', 0)} />
+      <mesh ref={blob} rotation-x={-Math.PI / 2} position-y={0.02} material={M.blob()} renderOrder={1} userData={{ noMerge: true }}><planeGeometry args={[0.9, 0.9]} /></mesh>
       <group ref={hips} position-y={0.36}>
         {/* Legs */}
         {[0, 1].map((i) => (

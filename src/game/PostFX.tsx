@@ -2,12 +2,22 @@ import { EffectComposer, Bloom, Vignette, SMAA, ToneMapping, N8AO, HueSaturation
 import { ToneMappingMode } from 'postprocessing'
 import { useFrame } from '@react-three/fiber'
 import { useSettings } from '../core/settings'
+import { usePerf } from '../core/device'
 
 /** Cinematic finish: AO, bloom on emissives, AA, gentle grade and vignette. */
 export function PostFX() {
-  const quality = useSettings((s) => s.quality)
+  const tier = usePerf((s) => s.tier)
   const reduceFlashes = useSettings((s) => s.reduceFlashes)
-  if (quality === 'low') return <PlainRender />
+  if (tier === 'low') return <PlainRender />
+  if (tier === 'medium') {
+    return (
+      <EffectComposer multisampling={0} enableNormalPass={false}>
+        <Bloom mipmapBlur luminanceThreshold={0.9} intensity={reduceFlashes ? 0.3 : 0.6} radius={0.6} />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <SMAA />
+      </EffectComposer>
+    )
+  }
   return (
     <EffectComposer multisampling={0} enableNormalPass={false}>
       <N8AO halfRes aoRadius={1.6} intensity={2.2} distanceFalloff={0.8} quality="performance" />

@@ -62,9 +62,14 @@ export function SettingsPanel() {
               </label>
             )}
             <h4>Gráficos</h4>
-            <label className="setting toggle">
-              <span>Calidad alta<small>Oclusión ambiental, bloom y sombras finas</small></span>
-              <input data-nav type="checkbox" checked={quality === 'high'} onChange={(e) => set({ quality: e.target.checked ? 'high' : 'low' })} />
+            <label className="setting">
+              <span>Calidad gráfica<small>Automática ajusta según tu equipo y los FPS</small></span>
+              <select data-nav value={quality} onChange={(e) => set({ quality: e.target.value as Settings['quality'] })}>
+                <option value="auto">Automática</option>
+                <option value="high">Alta (AO, bloom, sombras finas)</option>
+                <option value="medium">Media (bloom, sombras)</option>
+                <option value="low">Baja (máxima fluidez)</option>
+              </select>
             </label>
             <Toggle label="Mostrar FPS y latencia" k="showFps" />
           </div>
@@ -74,6 +79,10 @@ export function SettingsPanel() {
             <Slider label="Sensibilidad del stick" k="stickSensitivity" min={0.2} max={3} />
             <Toggle label="Invertir eje vertical" k="invertY" />
             <Toggle label="Agarre alterno (RT pulsar en vez de mantener)" k="grabToggle" />
+            <h4>Pantalla táctil</h4>
+            <Slider label="Sensibilidad al arrastrar" k="touchSensitivity" min={0.3} max={2.5} />
+            <Slider label="Tamaño de los botones" k="touchScale" min={0.8} max={1.3} />
+            <Toggle label="Vibración" k="haptics" />
             <h4>Accesibilidad</h4>
             <Toggle label="Modo ayuda" k="assist" hint="Sincronía a 450 ms, agarres más anchos, más alcance" />
             <Toggle label="Reducir sacudidas de cámara" k="reduceShake" />

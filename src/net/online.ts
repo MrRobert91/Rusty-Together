@@ -34,6 +34,49 @@ function endpoint() {
   return location.origin
 }
 
+/* ------------------------------------------------------------ Shared clock
+ * Both peers sync to the *server* clock (NTP-style, lowest-RTT sample wins).
+ * It starts the moment you enter the lobby, so it is already converged when
+ * the level starts, and it never depends on the other peer's main thread.
+ */
+const EPOCH = Date.UTC(2026, 0, 1)
+export const clock = { offset: 0, ready: false, rtt: 0.06, samples: [] as { rtt: number; off: number }[] }
+let clockTimer = 0
+let clockCount = 0
+
+function startClock(r: Room) {
+  stopClock()
+  clock.samples = []
+  clockCount = 0
+  const tick = () => {
+    if (room !== r) return
+    r.send('ping', performance.now())
+    clockCount++
+    // Burst at first for fast convergence, then a gentle heartbeat.
+    clockTimer = window.setTimeout(tick, clockCount < 12 ? 120 : 1000)
+  }
+  tick()
+}
+
+function stopClock() { window.clearTimeout(clockTimer) }
+
+function clockSample(d: { t0: number; server: number }) {
+  const now = performance.now()
+  const rtt = now - d.t0
+  const off = d.server + rtt / 2 - now
+  clock.samples.push({ rtt, off })
+  if (clock.samples.length > 16) clock.samples.shift()
+  const best = clock.samples.reduce((a, b) => (b.rtt < a.rtt ? b : a))
+  const sorted = clock.samples.map((x) => x.rtt).sort((a, b) => a - b)
+  clock.rtt = sorted[Math.floor(sorted.length / 2)] / 1000
+  // Slew (never jump) once we're synced, so gameplay time stays smooth.
+  clock.offset = clock.ready ? clock.offset + Math.max(-4, Math.min(4, best.off - clock.offset)) : best.off
+  clock.ready = true
+}
+
+/** Seconds on the shared (server) timeline. */
+export function sharedTime() { return (performance.now() + clock.offset - EPOCH) / 1000 }
+
 let client: Client | null = null
 let room: Room | null = null
 const lobbyEvents = new Emitter()
@@ -63,11 +106,13 @@ function bindRoom(r: Room) {
   r.onMessage('peer-joined', () => { useLobby.setState({ peerDropped: false }); lobbyEvents.emit('peer-joined', {}) })
   r.onMessage('peer-dropped', () => { useLobby.setState({ peerDropped: true }); lobbyEvents.emit('peer-dropped', {}) })
   r.onMessage('peer-back', () => { useLobby.setState({ peerDropped: false }); lobbyEvents.emit('peer-back', {}) })
-  r.onMessage('pong', () => {})
+  r.onMessage('pong', (d: { t0: number; server: number }) => clockSample(d))
+  startClock(r)
   r.onMessage('r', (m: Relay) => lobbyEvents.emit('relay', m))
   r.onMessage('*', () => {})
   r.onLeave((code: number) => {
     if (room !== r) return
+    stopClock()
     room = null
     lobbyEvents.emit('left', { code })
     useLobby.setState({ status: 'idle', players: [], code: '' })
@@ -75,11 +120,24 @@ function bindRoom(r: Room) {
   r.onError((_c: number, message?: string) => useLobby.setState({ error: message || 'Error de red' }))
 }
 
+/** Retry transient network failures (cold servers, flaky mobile data); not "room not found". */
+async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  let last: unknown
+  for (let i = 0; i < tries; i++) {
+    try { return await fn() } catch (e) {
+      last = e
+      if (/not found|invalid|locked|full/i.test(String((e as Error)?.message || e))) throw e
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
+  }
+  throw last
+}
+
 export async function hostRoom(name: string) {
   useLobby.setState({ status: 'connecting', error: '' })
   try {
     client = new Client(endpoint())
-    bindRoom(await client.create(ROOM_NAME, { name }))
+    bindRoom(await withRetry(() => client!.create(ROOM_NAME, { name })))
   } catch (e) {
     useLobby.setState({ status: 'error', error: friendlyError(e) })
   }
@@ -91,7 +149,7 @@ export async function joinRoom(rawCode: string, name: string) {
   useLobby.setState({ status: 'connecting', error: '' })
   try {
     client = new Client(endpoint())
-    bindRoom(await client.joinById(code, { name }))
+    bindRoom(await withRetry(() => client!.joinById(code, { name })))
   } catch (e) {
     useLobby.setState({ status: 'error', error: friendlyError(e) })
   }
@@ -113,13 +171,8 @@ export class OnlineSession implements Session {
   readonly localSlot: Slot
   readonly peerSlot: Slot
   peerConnected = true
-  rtt = 0.08
   private em = new Emitter()
-  private offset = 0
-  private offsetReady = false
-  private samples: { rtt: number; off: number }[] = []
   private unsub: Array<() => void> = []
-  private pingTimer = 0
 
   constructor() {
     const lv = useLobby.getState()
@@ -127,49 +180,19 @@ export class OnlineSession implements Session {
     this.isHost = !!me?.isHost
     this.localSlot = (me?.slot ?? 0) as Slot
     this.peerSlot = (this.localSlot === 0 ? 1 : 0) as Slot
-    this.unsub.push(lobbyEvents.on('relay', (m: Relay) => this.onRelay(m)))
+    this.unsub.push(lobbyEvents.on('relay', (m: Relay) => this.em.emit(m.t, m.d)))
     this.unsub.push(lobbyEvents.on('peer-dropped', () => { this.peerConnected = false; this.em.emit('peer', false) }))
     this.unsub.push(lobbyEvents.on('peer-back', () => { this.peerConnected = true; this.em.emit('peer', true) }))
     this.unsub.push(lobbyEvents.on('peer-joined', () => { this.peerConnected = true; this.em.emit('peer', true) }))
     this.unsub.push(lobbyEvents.on('peer-left', () => { this.peerConnected = false; this.em.emit('peer', false) }))
-    if (!this.isHost) {
-      this.ping()
-      this.pingTimer = window.setInterval(() => this.ping(), 1000)
-    } else {
-      this.pingTimer = window.setInterval(() => this.send('_hping', performance.now()), 1000)
-    }
   }
 
-  private ping() { this.send('_ping', performance.now()) }
-
-  private onRelay(m: Relay) {
-    if (m.t === '_ping') { this.send('_pong', { t0: m.d, h: performance.now() / 1000 }); return }
-    if (m.t === '_hping') { this.send('_hpong', m.d); return }
-    if (m.t === '_hpong') { const r = (performance.now() - (m.d as number)) / 1000; this.rtt = Math.min(r, this.rtt * 0.7 + r * 0.3); return }
-    if (m.t === '_pong') {
-      // NTP-style: the sample with the lowest round trip gives the most
-      // trustworthy offset (a blocked main thread inflates the others).
-      const d = m.d as { t0: number; h: number }
-      const now = performance.now()
-      const rtt = (now - d.t0) / 1000
-      const off = d.h + rtt / 2 - now / 1000
-      this.samples.push({ rtt, off })
-      if (this.samples.length > 10) this.samples.shift()
-      const best = this.samples.reduce((a, b) => (b.rtt < a.rtt ? b : a))
-      const sorted = this.samples.map((x) => x.rtt).sort((a, b) => a - b)
-      this.rtt = sorted[Math.floor(sorted.length / 2)]
-      this.offset = this.offsetReady ? this.offset + (best.off - this.offset) * 0.3 : best.off
-      this.offsetReady = true
-      return
-    }
-    this.em.emit(m.t, m.d)
-  }
-
+  /** Round trip to the server (the peer is roughly one RTT away through the relay). */
+  get rtt() { return clock.rtt }
   send(t: string, d: unknown) { room?.send('r', { t, d }) }
   on(t: string, cb: (d: any) => void) { return this.em.on(t, cb) }
-  hostTime() { return performance.now() / 1000 + (this.isHost ? 0 : this.offset) }
+  hostTime() { return sharedTime() }
   dispose() {
-    window.clearInterval(this.pingTimer)
     this.unsub.forEach((u) => u())
     this.em.clear()
   }

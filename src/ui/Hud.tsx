@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useHud } from '../game/hud'
 import { useVoice } from '../net/voice'
-import { currentDevice, glyph, onDeviceChange, type Btn, type Device } from '../core/input'
+import { currentDevice, deviceText, glyph, onDeviceChange, type Btn, type Device } from '../core/input'
 import { G, localSlot, peerSlot } from '../game/runtime'
 import { cameraRef } from '../game/CameraRig'
 import { SLOT_COLOR, SLOT_NAME } from '../game/tuning'
@@ -11,7 +11,7 @@ import { backToMenu, startSolo } from './App'
 import { lobbySend, useLobby } from '../net/online'
 import { useSettings } from '../core/settings'
 
-function useDevice() {
+export function useDevice() {
   const [d, setD] = useState<Device>(currentDevice())
   useEffect(() => { const off = onDeviceChange(setD); return () => { off() } }, [])
   return d
@@ -68,7 +68,7 @@ export function Hud() {
           <div className="room-mode">{h.roomTitle.mode}</div>
         </div>
       )}
-      {h.objective && <div className="objective"><span>◆</span> {h.objective}</div>}
+      {h.objective && <div className="objective"><span>◆</span> {deviceText(h.objective, device)}</div>}
       {h.banner && (
         <div className="banner" key={h.banner.title} style={{ ['--bc' as any]: h.banner.color ?? '#ffd23a' }}>
           <div className="banner-title">{h.banner.title}</div>
@@ -89,9 +89,9 @@ export function Hud() {
         ))}
       </div>
 
-      {h.subtitle && <div className="subtitle"><b style={{ color: h.subtitle.color }}>{h.subtitle.who}:</b> {h.subtitle.text}</div>}
+      {h.subtitle && <div className="subtitle"><b style={{ color: h.subtitle.color }}>{h.subtitle.who}:</b> {deviceText(h.subtitle.text, device)}</div>}
       <div className="toasts in-game">
-        {h.toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{t.text}</div>)}
+        {h.toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{deviceText(t.text, device)}</div>)}
       </div>
       {h.stickers.length > 0 && <div className="stickers">{h.stickers.map((s, i) => <span key={i} title="Pegatina de sesión">{s}</span>)}</div>}
 
@@ -230,7 +230,7 @@ function ClickToPlay() {
     document.addEventListener('pointerlockchange', f)
     return () => document.removeEventListener('pointerlockchange', f)
   }, [])
-  if (locked || paused || done || device === 'pad' || location.search.includes('nooverlay')) return null
+  if (locked || paused || done || device !== 'kbm' || location.search.includes('nooverlay')) return null
   return (
     <div className="click-to-play" onClick={() => { const c = document.querySelector('canvas'); c?.requestPointerLock?.() }}>
       <div>Haz clic para jugar</div>

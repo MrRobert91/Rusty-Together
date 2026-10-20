@@ -12,7 +12,7 @@ export interface Session {
   readonly localSlot: Slot
   readonly peerSlot: Slot
   peerConnected: boolean
-  rtt: number
+  readonly rtt: number
   /** Send a gameplay message to the other peer. */
   send(t: string, d: unknown): void
   on(t: string, cb: Handler): () => void

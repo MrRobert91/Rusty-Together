@@ -3,6 +3,36 @@ import { G, arr, isHost, type Mini, type CableState } from '../runtime'
 import { NET } from '../tuning'
 import type { Slot } from '../../../shared/protocol'
 
+/* ------------------------------------------------------------ Adaptive jitter buffer
+ * Each stream measures how late its packets arrive (on the shared clock) and
+ * renders just far enough in the past to always have a newer sample: ~35 ms on
+ * a LAN, more on a jittery mobile link. No fixed 100 ms tax for everyone.
+ */
+class Lateness {
+  mean = 0.05
+  dev = 0.02
+  n = 0
+  cur = 0.1
+  constructor(public rate: number) {}
+  add(sampleT: number) {
+    const late = G.session!.hostTime() - sampleT
+    if (this.n++ === 0) this.mean = late
+    const d = late - this.mean
+    this.mean += d * 0.08
+    this.dev += (Math.abs(d) - this.dev) * 0.08
+  }
+  /** Smoothed render delay (seconds). */
+  delay(dt = 1 / 60) {
+    const target = Math.max(0.03, Math.min(0.35, this.mean + 2.5 * this.dev + 0.6 / this.rate))
+    // Grow fast (avoid starving), shrink slowly (avoid visible speed-ups).
+    const k = target > this.cur ? 0.25 : 0.02
+    this.cur += (target - this.cur) * Math.min(1, k * dt * 60)
+    return this.cur
+  }
+}
+export const lateMini = new Lateness(NET.poseHz)
+export const lateWorld = new Lateness(NET.worldHz)
+
 /* ------------------------------------------------------------ Mini poses */
 
 const CABLE: CableState[] = ['idle', 'flying', 'attached', 'retract']
@@ -67,6 +97,7 @@ const buffers: Record<number, Sample[]> = { 0: [], 1: [] }
 
 export function receiveMiniPose(m: Mini, d: MiniPose) {
   const buf = buffers[m.slot]
+  lateMini.add(d.t)
   buf.push({ t: d.t, p: new Vector3(d.p[0], d.p[1], d.p[2]), v: new Vector3(d.v[0], d.v[1], d.v[2]), y: d.y })
   while (buf.length > 30) buf.shift()
   const f = d.f
@@ -101,14 +132,14 @@ export function receiveMiniPose(m: Mini, d: MiniPose) {
 export function sampleMini(m: Mini) {
   const buf = buffers[m.slot]
   if (!buf.length) return
-  const rt = G.session!.hostTime() - NET.interpDelay
+  const rt = G.session!.hostTime() - lateMini.delay()
   let i = buf.length - 1
   while (i > 0 && buf[i - 1].t > rt) i--
   const b = buf[i]
   const a = buf[Math.max(0, i - 1)]
   if (rt >= b.t || a === b) {
-    // Extrapolate briefly (≤ 100 ms) to hide jitter.
-    const ex = Math.min(Math.max(rt - b.t, 0), 0.1)
+    // Extrapolate briefly (≤ 150 ms) to hide jitter.
+    const ex = Math.min(Math.max(rt - b.t, 0), 0.15)
     m.pos.copy(b.p).addScaledVector(b.v, ex)
     m.vel.copy(b.v)
     m.yaw = b.y
@@ -123,7 +154,7 @@ export function sampleMini(m: Mini) {
   m.yaw = a.y + dy * k
 }
 
-export function clearBuffers() { buffers[0] = []; buffers[1] = [] }
+export function clearBuffers() { buffers[0] = []; buffers[1] = []; fullTimer = 99; lateMini.n = 0; lateWorld.n = 0 }
 
 /* ------------------------------------------------------------ World snapshot (host → guest) */
 
@@ -135,7 +166,7 @@ export interface WorldSnap {
   full?: boolean
 }
 
-let fullTimer = 0
+let fullTimer = 99 // first snapshot carries the full state
 
 export function encodeWorld(dt: number): WorldSnap {
   const now = G.session!.hostTime()
@@ -174,6 +205,7 @@ function encodeBig() {
 const bigBuf: { t: number; p: Vector3; v: Vector3; y: number }[] = []
 
 export function receiveWorld(s: WorldSnap) {
+  lateWorld.add(s.t)
   // Vars first: gameplay state for props, HUD and level scripts.
   for (const [k, val] of Object.entries(s.v)) {
     if (G.vars[k] !== val) { G.vars[k] = val; varListeners.get(k)?.forEach((cb) => cb(val)) }
@@ -232,7 +264,7 @@ const tq2 = new Quaternion()
 
 /** Guest: drive kinematic proxies of host-simulated bodies. */
 export function sampleBodies(localSlot: Slot, carryTarget: (id: string) => Vector3 | null) {
-  const rt = G.session!.hostTime() - NET.interpDelay
+  const rt = G.session!.hostTime() - lateWorld.delay()
   for (const nb of G.bodies.values()) {
     const own = carryTarget(nb.id)
     if (own) {
@@ -258,13 +290,13 @@ export function sampleBodies(localSlot: Slot, carryTarget: (id: string) => Vecto
 export function sampleBig() {
   if (!bigBuf.length) return
   const B = G.big
-  const rt = G.session!.hostTime() - NET.interpDelay
+  const rt = G.session!.hostTime() - lateWorld.cur
   let i = bigBuf.length - 1
   while (i > 0 && bigBuf[i - 1].t > rt) i--
   const b = bigBuf[i]
   const a = bigBuf[Math.max(0, i - 1)]
   if (a === b || rt >= b.t) {
-    const ex = Math.min(Math.max(rt - b.t, 0), 0.1)
+    const ex = Math.min(Math.max(rt - b.t, 0), 0.15)
     B.pos.copy(b.p).addScaledVector(b.v, ex)
     B.vel.copy(b.v)
     B.yaw = b.y

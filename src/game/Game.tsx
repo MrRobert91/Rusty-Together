@@ -1,7 +1,9 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { AdaptiveDpr, Preload } from '@react-three/drei'
+import { PerformanceMonitor, Preload } from '@react-three/drei'
+import { usePerf, tier, stepDownTier } from '../core/device'
+import { ShadowToggle } from './perf/ShadowToggle'
 import * as THREE from 'three'
 import { G, resetRuntime, localSlot } from './runtime'
 import { Simulation, resetSimulationState } from './Simulation'
@@ -13,14 +15,14 @@ import { BigRobot } from './robots/BigRobot'
 import { MergeFx } from './robots/MergeFx'
 import { Particles } from './fx/Particles'
 import { PostFX } from './PostFX'
+import { StaticBatcher } from './perf/StaticBatch'
 import { GRAVITY } from './tuning'
 import { LEVELS } from './levels'
 import { bindCheckpoints, cps, reachCheckpoint } from './levels/checkpoints'
 import { resetVarListeners } from './net/replication'
 import type { Session } from '../net/session'
-import { useHud } from './hud'
+import { useHud, toast } from './hud'
 import { setMusic } from '../core/audio'
-import { useSettings } from '../core/settings'
 
 export function Game({ level, session }: { level: string; session: Session }) {
   const def = LEVELS[level]
@@ -34,7 +36,9 @@ export function Game({ level, session }: { level: string; session: Session }) {
     return true
   }, [level, session, def])
   const [paused, setPaused] = useState(false)
-  const quality = useSettings((s) => s.quality)
+  const tierNow = usePerf((s) => s.tier)
+  // GL context options are fixed at creation: decide them from the initial tier.
+  const initialTier = useMemo(() => tier(), [])
 
   useEffect(() => {
     const off = bindCheckpoints()
@@ -56,12 +60,12 @@ export function Game({ level, session }: { level: string; session: Session }) {
   if (!ready) return null
   return (
     <Canvas
-      shadows
-      dpr={quality === 'high' ? [1, 1.75] : [0.75, 1.25]}
-      gl={{ antialias: false, powerPreference: 'high-performance', stencil: false }}
-      camera={{ fov: 55, near: 0.1, far: 900, position: [0, 5, 10] }}
+      shadows={initialTier !== 'low'}
+      dpr={tierNow === 'high' ? [1, 1.75] : tierNow === 'medium' ? [1, 1.4] : [0.75, 1.15]}
+      gl={{ antialias: initialTier === 'low', powerPreference: 'high-performance', stencil: false }}
+      camera={{ fov: 55, near: 0.1, far: 700, position: [0, 5, 10] }}
       onCreated={({ gl, scene }) => {
-        if (import.meta.env.DEV) (window as any).__scene = scene
+        if (import.meta.env.DEV) { (window as any).__scene = scene; (window as any).__gl = gl }
         gl.toneMapping = THREE.NoToneMapping
         gl.shadowMap.type = THREE.PCFShadowMap
       }}
@@ -70,6 +74,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
         <Physics timeStep={1 / 60} gravity={[0, -GRAVITY, 0]} updatePriority={-50} paused={paused} interpolate>
           <Atmosphere />
           <def.Scene />
+          <StaticBatcher />
           <MiniRobot mini={G.minis[0]} spawn={spawnA} yaw={start.yaw} />
           <MiniRobot mini={G.minis[1]} spawn={spawnB} yaw={start.yaw} />
           <BigRobot />
@@ -80,7 +85,12 @@ export function Game({ level, session }: { level: string; session: Session }) {
         </Physics>
         <Particles />
         <PostFX />
-        <AdaptiveDpr pixelated={false} />
+        <PerformanceMonitor
+          bounds={() => [42, 120]}
+          flipflops={3}
+          onDecline={() => { if (stepDownTier()) toast(`Calidad ajustada a «${tier() === 'medium' ? 'media' : 'baja'}» para ir más fluido`, 'info', 2600) }}
+        />
+        <ShadowToggle />
         <Preload all />
       </Suspense>
     </Canvas>

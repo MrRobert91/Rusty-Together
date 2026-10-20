@@ -61,12 +61,44 @@ npm run dev          # cliente Vite (http://localhost:5173) + servidor Colyseus 
 | Cruceta | 1-4 | Gestos | Gestos |
 | — | V / M | Pulsar para hablar / silenciar | |
 
+### Móvil y tableta
+
+Se juega en horizontal. Al primer toque el juego pasa a pantalla completa y bloquea la orientación cuando el navegador lo permite.
+
+- **Pulgar izquierdo:** stick flotante. Aparece donde apoyas el dedo y se arrastra contigo si te pasas del borde, así que nunca hay que volver al centro.
+- **Pulgar derecho:** arrastra en cualquier zona libre para mover la cámara. Unidos, ese arrastre apunta tu brazo.
+- **Botones en arco alrededor de *Saltar*:** Puño, Tensar y Agarrar en el primer anillo; Agachar y Unir, más pequeños, en el segundo. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
+- Los botones que pide el juego parpadean. Los textos de objetivo cambian «RT», «X»… por los iconos de pantalla.
+- Hay vibración háptica. En *Ajustes → Pantalla táctil* se cambian la sensibilidad, el tamaño de los botones y la vibración.
+- Arriba a la derecha están el micro (online), la señal, los gestos y la pausa.
+
 ## Producción y despliegue
 
 ```bash
-npm run build        # typecheck + bundle en dist/
+npm run build        # typecheck + bundle en dist/ + precompresión brotli/gzip
 PORT=8080 npm start  # un único proceso: Colyseus + estáticos de dist/
 ```
+
+El servidor entrega los `.br`/`.gz` generados al compilar: el bundle baja de 4,5 MB a 1,2 MB. Los assets con hash se cachean un año y `index.html` se revalida siempre.
+
+### Docker / Sliplane
+
+```bash
+docker build -t rusty-together .
+docker run -p 8080:8080 rusty-together   # http://localhost:8080
+```
+
+La imagen es multi-etapa sobre `node:22-alpine`. Ejecuta el servidor TypeScript directamente (Node 22 elimina los tipos), corre como usuario sin privilegios e incluye `HEALTHCHECK` contra `/health`.
+
+Para desplegar en [Sliplane](https://sliplane.io):
+
+1. Crea un servicio desde el repositorio de GitHub. *Dockerfile path*: `Dockerfile` (raíz).
+2. **Puerto expuesto:** `8080`. La imagen ya define `PORT=8080`; si el servicio define otro `PORT`, el servidor lo respeta.
+3. **Health check:** `/health` (responde `{"ok":true}`).
+4. Opcional: `VITE_TURN_URL`, `VITE_TURN_USER` y `VITE_TURN_PASS` para la voz detrás de NAT estrictos. Son argumentos de *build* (`ARG` en el Dockerfile), porque Vite los incrusta en el cliente al compilar.
+5. Despliega. El cliente se conecta por WebSocket al mismo origen (HTTPS → `wss://`), así que no hace falta configurar ninguna URL.
+
+El estado de las salas vive en memoria. Usa **una sola instancia**: no escales horizontalmente sin añadir un presence/driver compartido de Colyseus (Redis).
 
 En producción, el cliente se conecta al mismo origen. Si sirves el cliente por separado, define `VITE_SERVER_URL`.
 
@@ -85,14 +117,25 @@ tests/            Vitest (lógica pura e invariantes de tuning del GDD)
 .claude/skills    Skills de gamedev (three.js, game feel, cámara, plataformas…) para agentes
 ```
 
+### Rendimiento
+
+- **Niveles de calidad** *alta / media / baja*. En modo automático se elige uno según el dispositivo (los móviles empiezan en baja). Un `PerformanceMonitor` baja de nivel en caliente si no se mantienen los FPS.
+  - **Baja:** sin sombras dinámicas (se usan sombras de mancha), sin postproceso, DPR reducido y menos nubes y partículas.
+  - **Media:** bloom, ACES y SMAA.
+  - **Alta:** añade N8AO, gradación y viñeta.
+- **Batching estático:** al cargar el nivel, todo el escenario marcado como estático se fusiona por material y por celda de 80 m, sin perder el frustum culling.
+- **Rig merging:** las piezas de cada robot, caja o cangrejo que se mueven juntas se fusionan en una malla con color por vértice.
+- **Resultado:** de unas 830 a unas 430 draw calls en alta y unas 320 en baja.
+
 ### Modelo de red
 
 Sigue el GDD: el anfitrión valida y el invitado envía intenciones.
 
-- **Minis:** cada jugador simula su propio mini robot, con respuesta inmediata, y envía su pose a 30 Hz. El robot del compañero es un proxy cinemático interpolado con 100 ms de retardo. Eso permite subirse a su cabeza (trampolín), agarrar su mano o empujarlo.
-- **Mundo compartido:** el anfitrión simula todo lo compartido (cuerpo unido, cajas, balancín, cangrejo, arena, puertas) y envía instantáneas a 20 Hz con variables replicadas por diferencias.
+- **Minis:** cada jugador simula su propio mini robot, con respuesta inmediata, y envía su pose a 30 Hz. El robot del compañero es un proxy cinemático interpolado con un búfer de jitter adaptativo. El retardo se ajusta solo a la latencia y la variación reales de cada conexión (30–350 ms) y extrapola hasta 150 ms si falta un paquete. Eso permite subirse a su cabeza (trampolín), agarrar su mano o empujarlo.
+- **Mundo compartido:** el anfitrión simula todo lo compartido (cuerpo unido, cajas, balancín, cangrejo, arena, puertas) y envía instantáneas a 30 Hz con variables replicadas por diferencias. La primera instantánea es completa, para que el invitado vea el mundo correcto desde el primer frame.
 - **Cuerpo unido:** el invitado envía su pierna, su brazo y sus pulsaciones con marca de tiempo del reloj del anfitrión. El salto conjunto empieza como bote inmediato y se «mejora» si la otra pulsación cae dentro de la ventana. Así nadie siente retraso y la ventana no favorece al anfitrión.
-- **Reloj compartido:** usa la muestra de menor RTT, igual que NTP, para no fiarse de mensajes retrasados por un hilo bloqueado.
+- **Reloj compartido:** los dos clientes se sincronizan con el reloj del *servidor* al estilo NTP: se queda la muestra de menor RTT y los ajustes posteriores son graduales. Empieza con una ráfaga de pings en el lobby, así que al empezar el nivel ya ha convergido y no depende del hilo principal del otro jugador.
+- **Conexión a la primera:** crear la sala o unirse a ella se reintenta solo ante fallos transitorios (tres intentos con espera).
 
 ## Librerías
 

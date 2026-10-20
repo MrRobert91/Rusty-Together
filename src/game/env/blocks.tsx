@@ -69,7 +69,7 @@ export function Block({ pos, size, kind = 'rock', grass = kind === 'rock', rotY 
   const tuftGeo = useMemo(() => (grass ? makeTufts(w, d, tufts ?? Math.min(60, Math.floor(w * d * 0.6))) : null), [grass, w, d, tufts])
   const lip = useMemo(() => (grass ? makeGrassLip(w, d) : null), [grass, w, d])
   const content = (
-    <>
+    <group userData={{ batch: true }}>
       <mesh geometry={body} material={envMat(kind)} position-y={-h / 2} castShadow receiveShadow />
       {grass && <mesh geometry={worldBox(w + 0.12, 0.16, d + 0.12, 3)} material={envMat('grass')} position-y={-0.06} receiveShadow />}
       {lip && <mesh geometry={lip} material={envMat('grass')} position-y={-0.05} castShadow />}
@@ -81,7 +81,7 @@ export function Block({ pos, size, kind = 'rock', grass = kind === 'rock', rotY 
           ))}
         </>
       )}
-    </>
+    </group>
   )
   if (noCollide) return <group position={pos} rotation-y={rotY}>{content}</group>
   return (
@@ -134,7 +134,7 @@ export function Pillar({ pos, radius, height, collide = true }: { pos: V3; radiu
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * radius * 1.2, uv.getY(i) * height / 5)
     return g
   }, [radius, height])
-  const mesh = <mesh geometry={geo} material={envMat('rock')} position-y={-height / 2} castShadow receiveShadow />
+  const mesh = <mesh geometry={geo} material={envMat('rock')} position-y={-height / 2} castShadow receiveShadow userData={{ batch: true }} />
   if (!collide) return <group position={pos}>{mesh}</group>
   return (
     <RigidBody type="fixed" position={pos} colliders={false}>
@@ -147,7 +147,7 @@ export function Pillar({ pos, radius, height, collide = true }: { pos: V3; radiu
 /** Stylised tree like the ones topping the mesas. */
 export function Tree({ pos, s = 1 }: { pos: V3; s?: number }) {
   return (
-    <group position={pos} scale={s}>
+    <group position={pos} scale={s} userData={{ batch: true }}>
       <mesh material={envMat('trunk')} position-y={1} castShadow><cylinderGeometry args={[0.12, 0.2, 2, 6]} /></mesh>
       <mesh material={envMat('leaf')} position-y={2.3} castShadow><icosahedronGeometry args={[1.1, 0]} /></mesh>
       <mesh material={envMat('leaf')} position={[0.6, 2.0, 0.2]} castShadow><icosahedronGeometry args={[0.7, 0]} /></mesh>
@@ -171,7 +171,7 @@ export function Scaffold({ pos, w = 4, d = 4, h = 8, rotY = 0 }: { pos: V3; w?: 
     return mergeGeometries(gs)
   }, [w, d, h])
   return (
-    <group position={pos} rotation-y={rotY}>
+    <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
       <mesh geometry={geo} material={envMat('dark')} castShadow />
       <mesh geometry={worldBox(w + 0.4, 0.25, d + 0.4)} material={envMat('yellow')} position-y={h} castShadow />
     </group>
@@ -191,7 +191,7 @@ export function Banner({ pos, rotY = 0, color = '#f2b51d' }: { pos: V3; rotY?: n
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t
   }, [color])
   return (
-    <group position={pos} rotation-y={rotY}>
+    <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
       <mesh material={envMat('dark')} position-y={0.05}><boxGeometry args={[1.5, 0.1, 0.1]} /></mesh>
       <mesh position-y={-1.1}><planeGeometry args={[1.3, 2.2]} /><meshStandardMaterial map={tex} side={THREE.DoubleSide} roughness={0.9} /></mesh>
     </group>
@@ -200,7 +200,7 @@ export function Banner({ pos, rotY = 0, color = '#f2b51d' }: { pos: V3; rotY?: n
 
 export function HazardStrip({ pos, size, rotY = 0 }: { pos: V3; size: [number, number]; rotY?: number }) {
   return (
-    <mesh position={pos} rotation={[-Math.PI / 2, 0, rotY]} receiveShadow material={envMat('hazard')}>
+    <mesh position={pos} rotation={[-Math.PI / 2, 0, rotY]} receiveShadow material={envMat('hazard')} userData={{ batch: true }}>
       <planeGeometry args={size} />
     </mesh>
   )

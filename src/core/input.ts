@@ -20,7 +20,7 @@ export type Btn =
 
 export const BTNS: Btn[] = ['jump', 'brake', 'primary', 'couple', 'grab', 'secondary', 'signal', 'camera', 'pause', 'emote1', 'emote2', 'emote3', 'emote4', 'talk', 'mute']
 
-export type Device = 'kbm' | 'pad'
+export type Device = 'kbm' | 'pad' | 'touch'
 
 export interface InputFrame {
   /** Left stick, x = right, y = forward. Magnitude ≤ 1. */
@@ -73,12 +73,28 @@ const tappedKeys = new Set<string>()
 const tappedMouse = new Set<number>()
 let mouseDX = 0
 let mouseDY = 0
-let lastDevice: Device = 'kbm'
+let lastDevice: Device = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0) ? 'touch' : 'kbm'
 let prevHeld = blank()
 let enabled = true
 const listeners = new Set<(d: Device) => void>()
 
-function setDevice(d: Device) {
+/**
+ * Virtual controls write here (see ui/TouchControls). Stick is already
+ * normalised; look deltas are in CSS pixels and consumed once per frame.
+ */
+export const touch = {
+  move: { x: 0, y: 0 },
+  lookDX: 0,
+  lookDY: 0,
+  held: new Set<Btn>(),
+  tapped: new Set<Btn>(),
+}
+if (import.meta.env.DEV && typeof window !== 'undefined') (window as any).__touch = touch
+export function touchPress(b: Btn) { touch.held.add(b); touch.tapped.add(b); setDevice('touch') }
+export function touchRelease(b: Btn) { touch.held.delete(b) }
+export function touchClear() { touch.held.clear(); touch.tapped.clear(); touch.move.x = touch.move.y = 0; touch.lookDX = touch.lookDY = 0 }
+
+export function setDevice(d: Device) {
   if (d !== lastDevice) {
     lastDevice = d
     listeners.forEach((l) => l(d))
@@ -108,7 +124,8 @@ export function installInput() {
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault()
   })
   window.addEventListener('keyup', (e) => keys.delete(e.code))
-  window.addEventListener('blur', () => { keys.clear(); mouseButtons.clear() })
+  window.addEventListener('touchstart', () => setDevice('touch'), { passive: true, capture: true })
+  window.addEventListener('blur', () => { keys.clear(); mouseButtons.clear(); touchClear() })
   window.addEventListener('mousedown', (e) => {
     if (!document.pointerLockElement) return
     mouseButtons.add(e.button)
@@ -127,7 +144,7 @@ export function installInput() {
 
 export function setInputEnabled(v: boolean) {
   enabled = v
-  if (!v) { keys.clear(); mouseButtons.clear() }
+  if (!v) { keys.clear(); mouseButtons.clear(); touchClear() }
 }
 
 function deadzone(x: number, y: number, dz = 0.18) {
@@ -182,6 +199,18 @@ export function pollInput(dt: number): InputFrame {
     ly = -mouseDY * sens * (s.invertY ? -1 : 1)
     if (mouseDX || mouseDY) { ax = Math.max(-1, Math.min(1, mouseDX * 0.05)); ay = Math.max(-1, Math.min(1, -mouseDY * 0.05)) }
 
+    for (const b of touch.held) held[b] = true
+    for (const b of touch.tapped) held[b] = true
+    if (Math.hypot(touch.move.x, touch.move.y) > Math.hypot(mx, my)) { mx = touch.move.x; my = touch.move.y }
+    if (touch.lookDX || touch.lookDY) {
+      // Finger drags: a bit faster than the mouse, with a light acceleration
+      // curve so small corrections stay precise and big swipes turn around.
+      const ts = 0.0052 * s.touchSensitivity
+      const acc = (d: number) => d * (1 + Math.min(1.2, Math.abs(d) * 0.025))
+      lx += -acc(touch.lookDX) * ts
+      ly += -acc(touch.lookDY) * ts * (s.invertY ? -1 : 1)
+    }
+
     const pad = getPad()
     if (pad) {
       const l = deadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0)
@@ -210,6 +239,9 @@ export function pollInput(dt: number): InputFrame {
   mouseDY = 0
   tappedKeys.clear()
   tappedMouse.clear()
+  touch.tapped.clear()
+  touch.lookDX = 0
+  touch.lookDY = 0
 
   const pressed = blank()
   const released = blank()
@@ -230,12 +262,53 @@ export function rumble(strong: number, weak: number, ms: number) {
   try {
     pad?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })
   } catch { /* unsupported */ }
+  if (lastDevice === 'touch') haptic(Math.min(ms, 30 + 50 * strong))
+}
+
+/** Short vibration on phones (ignored where unsupported or disabled). */
+export function haptic(ms: number) {
+  if (!settings().haptics || typeof navigator === 'undefined' || !navigator.vibrate) return
+  try { navigator.vibrate(Math.round(ms)) } catch { /* unsupported */ }
 }
 
 /** Human readable glyph for a logical button on the current device. */
 export function glyph(b: Btn, device: Device = lastDevice): string {
+  if (device === 'touch') return TOUCH_GLYPH[b]
   if (device === 'pad') {
     return ({ jump: 'A', brake: 'B', primary: 'X', couple: 'Y', grab: 'RT', secondary: 'LT', signal: 'RB', camera: 'LB', pause: '☰', emote1: '↑', emote2: '→', emote3: '↓', emote4: '←', talk: '—', mute: '⧉' } as Record<Btn, string>)[b]
   }
   return ({ jump: 'Espacio', brake: 'Shift', primary: 'Clic izq.', couple: 'R', grab: 'E', secondary: 'Clic der.', signal: 'G', camera: 'Ratón', pause: 'Esc', emote1: '1', emote2: '2', emote3: '3', emote4: '4', talk: 'V', mute: 'M' } as Record<Btn, string>)[b]
+}
+
+/** Touch glyphs match the icons drawn on the on-screen buttons. */
+export const TOUCH_GLYPH: Record<Btn, string> = {
+  jump: '⤒', brake: '⤓', primary: '✊', couple: '∞', grab: '✋', secondary: '⟲', signal: '!', camera: '◎',
+  pause: 'II', emote1: '👋', emote2: '👍', emote3: '❤', emote4: '😂', talk: '🎙', mute: '🔇',
+}
+
+const TOUCH_TEXT: [RegExp, string][] = [
+  [/\(WASD \/ stick izquierdo\)/g, '(stick izquierdo)'],
+  [/Mira con el ratón\./g, 'Arrastra con el pulgar derecho para mirar.'],
+  [/\(Espacio \/ A\)/g, '(⤒ Saltar)'],
+  [/\(E \/ RT\)|RT \(E\)|\(RT\)/g, '(✋ Agarrar)'],
+  [/\(clic \/ X\)/g, '(✊ Puño)'],
+  [/LT \(clic derecho\)|\(LT\)/g, '⟲ Tensar'],
+  [/Y \(R\)/g, '∞ Unir'],
+  [/\(B\)/g, '(⤓ Agachar)'],
+  [/\bmantened Y\b/g, 'mantened ∞ Unir'],
+  [/\(A\)/g, '(⤒)'],
+  [/\(X\)/g, '(✊)'],
+  [/\b(Pulsa|pulsad|con) A\b/g, '$1 ⤒'],
+  [/\b(Pulsa|pulsad|con) X\b/g, '$1 ✊'],
+  [/\bA a la vez/g, '⤒ a la vez'],
+  [/\bX a la vez/g, '✊ a la vez'],
+  [/\bRT\b/g, '✋'],
+  [/\bLT\b/g, '⟲'],
+]
+
+/** Rewrites keyboard/pad hints in level text for the on-screen controls. */
+export function deviceText(s: string, device: Device = lastDevice) {
+  if (device !== 'touch' || !s) return s
+  for (const [re, to] of TOUCH_TEXT) s = s.replace(re, to)
+  return s
 }

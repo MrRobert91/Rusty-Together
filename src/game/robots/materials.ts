@@ -51,6 +51,25 @@ export const M = {
   chrome: () => std('chrome', { color: '#c9ccd2', roughness: 0.25, metalness: 0.9 }),
   accent: (hex: string) => std('accent' + hex, { color: hex, roughness: 0.42, metalness: 0.12, map: wearTex() }),
   glow: (hex: string, intensity = 2.2) => std('glow' + hex + intensity, { color: hex, emissive: hex, emissiveIntensity: intensity, roughness: 0.4, toneMapped: false }),
+  /** Soft dark disc used as a cheap contact shadow when real shadows are off. */
+  blob: () => {
+    let m = cache.get('blob')
+    if (!m) {
+      const c = document.createElement('canvas')
+      c.width = c.height = 64
+      const g = c.getContext('2d')!
+      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+      grd.addColorStop(0, 'rgba(0,0,0,0.55)')
+      grd.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = grd
+      g.fillRect(0, 0, 64, 64)
+      m = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
+      cache.set('blob', m)
+    }
+    return m as THREE.MeshBasicMaterial
+  },
+  /** Shared vertex-coloured robot material used by merged rig meshes. */
+  rigVC: () => std('rigVC', { color: '#ffffff', vertexColors: true, roughness: 0.48, metalness: 0.18, map: wearTex() }),
   basic: (hex: string, opacity = 1) => {
     const key = 'basic' + hex + opacity
     let m = cache.get(key)

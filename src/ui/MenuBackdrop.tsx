@@ -8,14 +8,14 @@ import { Ring } from '../game/env/interactive'
 import { EffectComposer, Bloom, Vignette, ToneMapping, SMAA } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Physics } from '@react-three/rapier'
-import { useSettings } from '../core/settings'
+import { usePerf } from '../core/device'
 
 /** Living title backdrop: Cian and Ámbar idle on a mesa while the camera drifts. */
 export function MenuBackdrop() {
-  const quality = useSettings((s) => s.quality)
+  const quality = usePerf((s) => s.tier)
   return (
     <div className="backdrop">
-      <Canvas shadows dpr={[1, 1.5]} camera={{ fov: 40, position: [6, 3, 8] }} gl={{ antialias: false }} onCreated={({ gl }) => { gl.toneMapping = THREE.NoToneMapping }}>
+      <Canvas shadows={quality !== 'low'} dpr={quality === 'low' ? [0.75, 1.1] : [1, 1.5]} camera={{ fov: 40, position: [6, 3, 8] }} gl={{ antialias: false }} onCreated={({ gl }) => { gl.toneMapping = THREE.NoToneMapping }}>
         <Suspense fallback={null}>
           <Physics paused>
             <Atmosphere />
@@ -29,7 +29,7 @@ export function MenuBackdrop() {
           </Physics>
           <Duo />
           <OrbitCam />
-          {quality === 'high' && (
+          {quality !== 'low' && (
             <EffectComposer multisampling={0}>
               <Bloom mipmapBlur luminanceThreshold={0.85} intensity={0.7} />
               <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
