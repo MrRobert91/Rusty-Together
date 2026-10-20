@@ -39,7 +39,7 @@ class Brain {
   arrived = false
   jumpCd = 0
   pilot: PilotMode = { jump: 'none', arms: 'none' }
-  queued: Array<{ at: number; kind: 'jump' | 'x' }> = []
+  queued: Array<{ at: number; kind: 'jump' | 'x' | 'xr' }> = []
   stuckT = 0
   lastPos = new THREE.Vector3()
   force = new YV3()
@@ -269,9 +269,11 @@ export function companionPilot(rp: PilotFrame, lp: PilotFrame) {
   rp.grab = lp.grab
   if (b.pilot.jump === 'sync') for (const _ of lp.jumps) b.queued.push({ at: now + 0.11, kind: 'jump' })
   if (b.pilot.arms === 'sync') for (const _ of lp.xs) b.queued.push({ at: now + 0.12, kind: 'x' })
+  if (b.pilot.arms === 'sync') for (const _ of lp.xr) b.queued.push({ at: now + 0.12, kind: 'xr' })
   b.queued = b.queued.filter((q) => {
     if (q.at > now) return true
     if (q.kind === 'jump') rp.jumps.push(q.at)
+    else if (q.kind === 'xr') rp.xr.push(q.at)
     else rp.xs.push(q.at)
     fx('sfx', { n: 'beepAmber', p: G.big.pos, v: 0.5 })
     return false

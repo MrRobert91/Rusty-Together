@@ -54,7 +54,7 @@ export function setupLevel1() {
 export function Level1() {
   useEffect(() => {
     say.room('1', 'Escuela de guantes', 'Separados')
-    say.objective('Subid al muro: uno se agacha (B) para hacer de trampolín y el de arriba ofrece la mano (RT).')
+    say.objective('Subid al muro: uno se agacha ({brake}) para hacer de trampolín y el de arriba ofrece la mano ({grab}).')
     say.mood('explore')
   }, [])
   return (
@@ -90,14 +90,14 @@ function Room1() {
       <Block pos={[-13, 0, -5]} size={[5, 8, 7]} />
       <Ring id="r1_practice" pos={[-8.3, 3.7, -5]} mount="hang" big={false} />
       <SafetyNet pos={[-8.25, -1.6, -5]} size={[4.5, 7]} returnTo={[-4.5, 0, -5]} />
-      <Sign pos={[-5.2, 2.2, -8.6]} rotY={0.6} text="Práctica" sub="X al anillo · LT carga" small />
+      <Sign pos={[-5.2, 2.2, -8.6]} rotY={0.6} text="Práctica" sub="mantén el gancho · suelta" small />
       <GoldenNut id="n1" pos={[-13.5, 1.2, -5]} />
 
       {/* B: the wall (2.4 m) — springboard + offered hand */}
       <Block pos={[0, 2.4, -17]} size={[10, 10.4, 10]} />
       <HazardStrip pos={[0, 0.03, -11.6]} size={[10, 0.6]} />
       <Sign pos={[-3.8, 1.8, -10.6]} rotY={0.2} text="¿Muy alto?" sub="agáchate (B): trampolín" small />
-      <Sign pos={[3.8, 4.2, -12.6]} rotY={-0.2} text="Desde arriba" sub="RT en el borde: ofrece la mano" small />
+      <Sign pos={[3.8, 4.2, -12.6]} rotY={-0.2} text="Desde arriba" sub="en el borde: ofrece la mano" small />
 
       {/* Gap with a high ring: only reachable from a partner's springboard */}
       <Ring id="r1_gap" pos={[0, 7.3, -23.8]} mount="hang" big={false} />
@@ -240,7 +240,7 @@ function Room5() {
       <Ring id="r5_slW" pos={[-1.9, 8.4, -159.6]} mount="hang" mini={false} sling={{ group: 'r5', to: V(0, 3.4, -170), time: 1.35 }} />
       <Ring id="r5_slE" pos={[1.9, 8.4, -159.6]} mount="hang" mini={false} sling={{ group: 'r5', to: V(0, 3.4, -170), time: 1.35 }} />
       <Scaffold pos={[0, 3.4, -159.6]} w={5.4} d={0.8} h={6.2} />
-      <Sign pos={[2.6, 5.6, -153.4]} rotY={-0.5} text="Tirachinas" sub="tensad y X a la vez" small />
+      <Sign pos={[2.6, 5.6, -153.4]} rotY={-0.5} text="Tirachinas" sub="tensad y soltad a la vez" small />
     </>
   )
 }
@@ -350,20 +350,20 @@ function Story() {
     if (lead < -67) once('r4', () => {
       say.room('4', 'Primer cuerpo', 'Unidos')
       reachCheckpoint('c4')
-      say.objective('Subid a la placa y mantened Y los dos para acoplaros.')
+      say.objective('Subid a la placa y mantened {couple} los dos para acoplaros.')
     })
-    if (G.form === 'joined' && G.big.pos.z > -90) once('r4walk', () => say.objective('Cada uno mueve su pierna. Un salto unilateral (A) basta para el primer hueco; para los siguientes, A a la vez.'))
+    if (G.form === 'joined' && G.big.pos.z > -90) once('r4walk', () => say.objective('Cada uno mueve su pierna. Un salto unilateral ({jump}) basta para el primer hueco; para los siguientes, {jump} a la vez.'))
 
     /* Room 5 */
     if (G.form === 'joined' && G.big.pos.z < -114.5 && G.big.grounded) once('r5', () => {
       reachCheckpoint('c5')
       say.room('5', 'Pasamanos de grúas', 'Unidos')
       say.mood('tension')
-      say.objective('Cruzad el balancín y avanzad de anillo en anillo: un brazo sujeta mientras el otro se lanza (X cada uno).')
+      say.objective('Cruzad el balancín y avanzad de anillo en anillo: un brazo sujeta mientras el otro se lanza (mantened {primary} cada uno).')
     })
     if (G.form === 'joined' && G.big.pos.z < -153.2 && G.big.grounded && G.big.pos.y > 3) once('r5b', () => {
       reachCheckpoint('c5b')
-      say.objective('Tirachinas: enganchad los dos anillos, tensad (LT) al máximo y pulsad X a la vez.')
+      say.objective('Tirachinas: mantened el gancho ({primary}) en los dos anillos hasta tensar al máximo y soltad a la vez.')
     })
     if (G.form === 'split' && lead < -114) once('r5split', () => say.toast('Los pasamanos necesitan brazos de 8 m: volved a uniros en la placa.', 'warn'))
   })

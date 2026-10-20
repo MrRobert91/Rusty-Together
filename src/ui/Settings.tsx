@@ -78,7 +78,7 @@ export function SettingsPanel() {
             <Slider label="Sensibilidad del ratón" k="mouseSensitivity" min={0.2} max={3} />
             <Slider label="Sensibilidad del stick" k="stickSensitivity" min={0.2} max={3} />
             <Toggle label="Invertir eje vertical" k="invertY" />
-            <Toggle label="Agarre alterno (RT pulsar en vez de mantener)" k="grabToggle" />
+            <Toggle label="Agarre alterno (pulsar Agarrar en vez de mantener)" k="grabToggle" />
             <h4>Pantalla táctil</h4>
             <Slider label="Sensibilidad al arrastrar" k="touchSensitivity" min={0.3} max={2.5} />
             <Slider label="Tamaño de los botones" k="touchScale" min={0.8} max={1.3} />
@@ -100,9 +100,8 @@ const ROWS: [Btn | 'move' | 'look', string, string][] = [
   ['look', 'Cámara', 'Apuntar tu brazo'],
   ['jump', 'Saltar (mantén = más alto)', 'Impulso de tu pierna · dos impulsos juntos = salto conjunto'],
   ['brake', 'Agacharse · trampolín para tu compañero', 'Anclar tu pierna (pivote)'],
+  ['primary', 'Gancho (4 m): mantén para engancharte y recoger; suelta para soltarte (cargado = muelle)', 'Brazo telescópico (8 m): mantén para tensar; soltad a la vez = tirachinas'],
   ['grab', 'Agarrar · ofrecer la mano · coger cajas', 'Agarrar asas con tu mano'],
-  ['primary', 'Lanzar puño cableado (4 m)', 'Lanzar brazo telescópico (8 m) · tirachinas'],
-  ['secondary', 'Recoger cable · cargar el muelle', 'Tensar tu cable'],
   ['couple', 'Mantener: acoplarse en una placa', 'Mantener: separarse'],
   ['signal', 'Señalar un punto', 'Señalar un punto'],
   ['emote1', 'Gestos (1-4 / cruceta)', 'Gestos'],

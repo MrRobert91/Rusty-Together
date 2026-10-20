@@ -130,14 +130,14 @@ export function CrabRoom() {
       reachCheckpoint('c6')
       say.room('6', 'Cangrejo clasificador', 'Clímax · ambas formas')
       say.mood('boss')
-      setObjective(s, G.form === 'joined' ? 'Separaos (mantened Y) para alcanzar los pestillos laterales.' : 'Enganchad cada uno un pestillo (X) y arrastradlo a la cinta con LT.')
+      setObjective(s, G.form === 'joined' ? 'Separaos (mantened {couple}) para alcanzar los pestillos laterales.' : 'Enganchad cada uno un pestillo y mantened el gancho ({primary}) para arrastrarlo a la cinta.')
       brain.go('idle')
     }
     brain.fsm.update()
 
     const calibW = !!G.vars.calibW
     const calibE = !!G.vars.calibE
-    if (s.started && phase !== 'stunned' && !calibW && !calibE && G.form === 'split') setObjective(s, 'Enganchad cada uno un pestillo (X) y arrastradlo a la cinta con LT. ¡Ojo a las pinzas!')
+    if (s.started && phase !== 'stunned' && !calibW && !calibE && G.form === 'split') setObjective(s, 'Enganchad cada uno un pestillo y mantened el gancho ({primary}) para arrastrarlo a la cinta. ¡Ojo a las pinzas!')
 
     /* ---- Phase A: latches ---- */
     for (const side of ['W', 'E'] as const) {
@@ -179,8 +179,8 @@ export function CrabRoom() {
       brain.go('stunned')
       hostSet('crabOpen', 1)
       reachCheckpoint('c6b')
-      say.banner('¡Frontal abierto!', 'Uníos y agarrad las dos asas (RT)', '#ffd23a')
-      setObjective(s, 'Acoplaos en la placa y agarrad las dos asas del frontal (mantened RT).')
+      say.banner('¡Frontal abierto!', 'Uníos y agarrad las dos asas', '#ffd23a')
+      setObjective(s, 'Acoplaos en la placa y agarrad las dos asas del frontal (mantened {grab}).')
     }
 
     /* ---- Claw hits (phase A) ---- */
@@ -253,7 +253,7 @@ export function CrabRoom() {
           placeFuseHandles(drop, B.yaw)
           hostSet('fuse', 'dropped')
           fx('sfx', { n: 'landHeavy', p: drop })
-          say.toast('¡Se os cayó el fusible! Agarradlo los dos (RT).', 'warn')
+          say.toast('¡Se os cayó el fusible! Agarradlo los dos ({grab}).', 'warn')
         } else if (B.pos.distanceTo(new THREE.Vector3(SOCKET.x, SOCKET.y + BIG.feet, SOCKET.z)) < 2.2 && B.grounded) {
           s.fuse = 'inserted'
           B.carrying = null
@@ -523,7 +523,7 @@ export function CrabPrompts() {
         const other = 1 - h
         prompt({ id: 'pry', text: h === me ? `Tú anclas (mantén B) · ${SLOT_NAME[other]} tira con su stick` : `${SLOT_NAME[h]} ancla · tú tira con el stick`, progress: ((G.vars.pry as number) ?? 0) / 2 })
         prompt({ id: 'prykey', btn: h === me ? 'brake' : 'jump', text: h === me ? 'Anclar pierna' : '(stick hacia fuera)' })
-      } else if (h === -2) prompt({ id: 'pry0', btn: 'brake', text: 'Uno ancla (B) mientras el otro tira con su stick' })
+      } else if (h === -2) prompt({ id: 'pry0', btn: 'brake', text: 'Uno ancla ({brake}) mientras el otro tira con su stick' })
     }
     if (G.form === 'joined' && G.vars.fuse === 'carried') prompt({ id: 'fusecarry', btn: 'grab', hold: true, text: 'No sueltes el fusible' })
     if (G.form === 'joined' && G.vars.fuse === 'dropped') prompt({ id: 'fusegrab', btn: 'grab', hold: true, text: 'Agarrad el fusible los dos' })
