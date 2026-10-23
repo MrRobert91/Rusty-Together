@@ -41,7 +41,7 @@ export function BigRobot() {
     view.vel.copy(B.vel)
     view.yaw = B.yaw
     view.grounded = B.grounded
-    view.crouch = B.legs[0].anchored && B.legs[1].anchored
+    view.crouch = false
     view.landT = B.landT
     view.landImpact = B.landImpact
     view.jumpT = B.jumpT

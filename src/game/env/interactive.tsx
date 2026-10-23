@@ -9,7 +9,7 @@ import { envMat, worldBox, type V3 } from './blocks'
 import { beltTex, signTex } from './textures'
 import { GEO, M } from '../robots/materials'
 import { useRigMerge } from '../perf/StaticBatch'
-import { BIG, COLORS, MINI, SLOT_COLOR } from '../tuning'
+import { BIG, BTN_COLOR, COLORS, MINI, SLOT_COLOR } from '../tuning'
 import { fx } from '../runtime'
 
 /* ------------------------------------------------------------ helpers */
@@ -87,7 +87,7 @@ export function Ring({ id, pos, mount = 'post', mini = true, big = true, sling, 
       </group>
       <group rotation-y={facing}>
         {[0, 1].map((i) => (
-          <mesh key={i} ref={halo[i]} geometry={GEO.ringFlat()} material={M.basic(SLOT_COLOR[i], 0.85)} visible={false} />
+          <mesh key={i} ref={halo[i]} geometry={GEO.ringFlat()} material={M.basic(BTN_COLOR.context, 0.85)} visible={false} />
         ))}
       </group>
     </group>
@@ -249,6 +249,57 @@ export function Switch({ id, pos, radius = 0.8, color = '#f2b51d', latch = false
       <mesh geometry={GEO.cyl()} material={envMat('dark')} scale={[radius + 0.15, 0.12, radius + 0.15]} position-y={0.03} receiveShadow userData={{ batch: true }} />
       <mesh ref={cap} geometry={GEO.cyl()} material={mat} scale={[radius, 0.14, radius]} castShadow />
       {label && <Sign pos={[0, 1.6, -radius - 0.2]} text={label} small />}
+    </group>
+  )
+}
+
+/* ------------------------------------------------------------ Punch button */
+
+/**
+ * Big arcade button on a post: punch it to set `pb:<id>` (host). With `latch`
+ * it stays on; otherwise it pops back after `holdS` seconds. The red rim is the
+ * punch button's colour, so it reads as "hit me".
+ */
+export function PunchButton({ id, pos, rotY = 0, latch = true, holdS = 4, color = BTN_COLOR.punch, label, post = true, onPress }: { id: string; pos: V3; rotY?: number; latch?: boolean; holdS?: number; color?: string; label?: string; post?: boolean; onPress?: (slot: 0 | 1) => void }) {
+  const face = useMemo(() => {
+    const s = Math.sin(rotY), c = Math.cos(rotY)
+    return new THREE.Vector3(pos[0] + s * 0.22, pos[1] + 1.25, pos[2] + c * 0.22)
+  }, [pos, rotY])
+  const anchor = useMemo(() => addAnchor({ id, kind: 'button', pos: face.clone(), mini: true, big: true }), [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const key = `pb:${id}`
+  useEffect(() => {
+    G.anchors.set(id, anchor)
+    G.punchHandlers.set(id, (slot) => {
+      if (G.vars[key] && latch) return
+      hostSet(key, 1)
+      hostSet(`${key}:t`, G.time)
+      fx('sfx', { n: 'lever', p: face })
+      fx('sfx', { n: 'success', p: face, v: 0.6 })
+      fx('particles', { n: 'burst', p: face, c: color, s: 0.6 })
+      onPress?.(slot as 0 | 1)
+    })
+    return () => { G.anchors.delete(id); G.punchHandlers.delete(id) }
+  }, [id, anchor]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cap = useRef<THREE.Mesh>(null!)
+  const st = useRef({ d: 0 })
+  useFrame((_, dt) => {
+    const on = !!G.vars[key]
+    if (isHost() && on && !latch && G.time - ((G.vars[`${key}:t`] as number) ?? 0) > holdS) hostSet(key, 0)
+    anchor.enabled = latch ? !on : true
+    st.current.d = THREE.MathUtils.damp(st.current.d, on ? 1 : 0, 16, dt)
+    cap.current.position.z = 0.16 - st.current.d * 0.1
+    ;(cap.current.material as THREE.MeshStandardMaterial).emissiveIntensity = on ? 1.6 : 0.35 + Math.sin(G.time * 4) * 0.2
+  })
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.35 }), [color])
+  return (
+    <group position={pos} rotation-y={rotY}>
+      {post && <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={0.55} scale={[0.14, 1.1, 0.14]} castShadow userData={{ batch: true }} />}
+      <group position-y={1.25}>
+        <mesh geometry={GEO.rbox(1, 1, 1, 0.12)} material={envMat('yellow')} scale={[0.72, 0.72, 0.24]} castShadow />
+        <mesh geometry={GEO.cyl()} material={envMat('dark')} rotation-x={Math.PI / 2} position-z={0.13} scale={[0.3, 0.06, 0.3]} />
+        <mesh ref={cap} geometry={GEO.cyl()} material={mat} rotation-x={Math.PI / 2} position-z={0.16} scale={[0.24, 0.12, 0.24]} />
+      </group>
+      {label && <Sign pos={[0, 2.3, 0]} text={label} small post={false} />}
     </group>
   )
 }

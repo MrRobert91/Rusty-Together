@@ -17,6 +17,7 @@ import { GEO, M } from './materials'
 const EMOTE_ICON = ['', '👋', '🎉', '👉', '❓']
 
 export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vector3; yaw: number }) {
+  const wallHands = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], [])
   const body = useRef<RapierRigidBody>(null)
   const view = useMemo(() => makeView(), [])
   const owned = mini.kind !== 'remote'
@@ -43,12 +44,17 @@ export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vecto
     const hidden = mini.hidden
     if (hidden !== lastHidden.current) {
       lastHidden.current = hidden
+      // Park the disabled body far below: a disabled body can keep a stale
+      // contact with the joined body spawned on top of it, which pins the
+      // joined body's vertical speed (it would walk on air).
+      if (hidden) { const p = b.translation(); b.setTranslation({ x: p.x, y: p.y - 400, z: p.z }, false) }
       b.setEnabled(!hidden)
     }
     view.vel.copy(mini.vel)
     view.yaw = mini.yaw
     view.grounded = mini.grounded
-    view.crouch = mini.crouch
+    // Squashed for a moment when the partner springs off our head.
+    view.crouch = G.time - mini.stompT < 0.22
     view.offering = mini.offering
     view.hanging = mini.hangOn >= 0
     view.carrying = !!mini.carrying
@@ -65,9 +71,20 @@ export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vecto
     // Hands: right hand follows the cable / offered glove / partner's glove.
     const c = mini.cable
     view.fistAway[1] = c.state !== 'idle'
-    view.handTargets[1] = c.state !== 'idle' ? c.tip : mini.offering ? mini.glove : mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : null
-    view.handTargets[0] = mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : null
     const partner = G.minis[mini.slot === 0 ? 1 : 0]
+    if (mini.cling) {
+      // Both hands flat on the wall above the head.
+      for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? 0.22 : -0.22
+        wallHands[i].set(mini.pos.x - mini.clingN.x * 0.34 - mini.clingN.z * side, mini.pos.y + 0.42, mini.pos.z - mini.clingN.z * 0.34 + mini.clingN.x * side)
+      }
+      view.handTargets[0] = wallHands[0]
+      view.handTargets[1] = c.state !== 'idle' ? c.tip : wallHands[1]
+    } else {
+      const towHand = mini.towing ? wallHands[0].set(partner.pos.x, partner.pos.y + 0.25, partner.pos.z) : null
+      view.handTargets[1] = c.state !== 'idle' ? c.tip : mini.offering ? mini.glove : mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : towHand
+      view.handTargets[0] = mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : null
+    }
     view.lookAt = c.state !== 'idle' ? c.tip : partner.hidden ? null : partner.pos.distanceTo(mini.pos) < 8 ? partner.pos : null
 
     // Footsteps derived from motion (works for local and replicated robots).

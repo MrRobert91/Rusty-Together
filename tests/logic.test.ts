@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode, randomCode } from '../shared/protocol'
 import { ballistic, camRelative, wrapAngle, dampAngle } from '../src/game/runtime'
-import { GRAVITY, MINI, BIG } from '../src/game/tuning'
+import { BTN_COLOR, GRAVITY, MINI, BIG } from '../src/game/tuning'
 
 describe('room codes', () => {
   it('generates codes from the unambiguous alphabet', () => {
@@ -72,27 +72,44 @@ describe('GDD tuning invariants', () => {
   })
 })
 
-describe('one-button hook', () => {
-  it('has no separate reel button: the hook is held, grab stays its own verb', async () => {
+describe('four action buttons (GameCube layout)', () => {
+  it('are jump, grab, punch and the contextual button; crouch and couple are gone', async () => {
     const { BTNS } = await import('../src/core/input')
-    expect(BTNS).not.toContain('secondary' as never)
-    expect(BTNS).toContain('primary')
-    expect(BTNS).toContain('grab')
+    for (const b of ['jump', 'grab', 'punch', 'context']) expect(BTNS).toContain(b)
+    for (const b of ['brake', 'couple', 'primary', 'secondary']) expect(BTNS).not.toContain(b as never)
+  })
+  it('each action button has its own colour for world highlights', () => {
+    const cols = new Set(Object.values(BTN_COLOR))
+    expect(cols.size).toBe(4)
   })
   it('a tap yank and a swing release stay gentler than the charged spring', () => {
     expect(MINI.yankSpeed).toBeLessThan(MINI.launchMin)
     expect(MINI.releaseBoost).toBeLessThan(MINI.launchMin)
     expect(MINI.chargeTime).toBeLessThanOrEqual(1) // GDD: the spring charges in up to 1 s
   })
+  it('the head bounce clears the 2.4 m wall of room 1 but a wall jump does not', () => {
+    const peak = (v: number) => (v * v) / (2 * GRAVITY)
+    expect(1 + peak(MINI.boostVel)).toBeGreaterThan(2.4) // partner is 1 m tall
+    expect(peak(Math.sqrt(2 * GRAVITY * MINI.jumpHeight) * MINI.wallJumpUp) + MINI.jumpHeight).toBeLessThan(2.4)
+  })
+  it('punch reaches further than a partner shove, but less than the hook', () => {
+    expect(MINI.punchPartnerRange).toBeLessThan(MINI.punchRange)
+    expect(MINI.punchRange).toBeLessThan(MINI.cableRange)
+  })
+  it('dragging is slower than walking and breaks before the partner is out of reach', () => {
+    expect(MINI.towSpeed).toBeLessThan(MINI.speed)
+    expect(MINI.towBreak).toBeGreaterThan(MINI.towRest + 1)
+  })
 })
 
 describe('button tokens in level text', () => {
   it('render as the glyph of the device in use', async () => {
     const { deviceText } = await import('../src/core/input')
-    const s = 'Mantén el gancho ({primary}) y agarra ({grab}).'
-    expect(deviceText(s, 'pad')).toBe('Mantén el gancho (RT) y agarra (LT).')
-    expect(deviceText(s, 'kbm')).toBe('Mantén el gancho (Clic izq.) y agarra (E).')
-    expect(deviceText(s, 'touch')).toContain('Gancho')
+    const s = 'Mantén {context} y agarra ({grab}); pega con {punch}.'
+    expect(deviceText(s, 'pad')).toBe('Mantén Y y agarra (B); pega con X.')
+    expect(deviceText(s, 'kbm')).toBe('Mantén Clic der y agarra (E); pega con Clic izq.')
+    expect(deviceText(s, 'touch')).toContain('Acción')
+    expect(deviceText(s, 'touch')).toContain('Pegar')
   })
   it('leave unknown braces alone', async () => {
     const { deviceText } = await import('../src/core/input')

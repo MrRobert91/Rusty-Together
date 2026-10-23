@@ -17,7 +17,7 @@ export type AiMode =
   | { k: 'sleep' }
   | { k: 'follow' }
   | { k: 'goto'; to: THREE.Vector3; face?: number }
-  | { k: 'crouch'; at: THREE.Vector3 }
+  | { k: 'base'; at: THREE.Vector3 }
   | { k: 'grabUp'; under: THREE.Vector3 }
   | { k: 'offer'; at: THREE.Vector3; face: number }
   | { k: 'couple'; at: THREE.Vector3 }
@@ -53,7 +53,7 @@ class Brain {
     this.fsm = new StateMachine<Brain>(this)
     this.fsm.add('sleep', new SleepState())
     this.fsm.add('move', new MoveState())
-    this.fsm.add('crouch', new CrouchState())
+    this.fsm.add('base', new BaseState())
     this.fsm.add('grabUp', new GrabUpState())
     this.fsm.add('offer', new OfferState())
     this.fsm.add('couple', new CoupleState())
@@ -130,12 +130,14 @@ class MoveState extends State<Brain> {
   }
 }
 
-class CrouchState extends State<Brain> {
+/** Stand still at the foot of a wall: the partner springs off our head. */
+class BaseState extends State<Brain> {
   execute(b: Brain) {
-    const m = b.mode as Extract<AiMode, { k: 'crouch' }>
-    if (b.steer(m.at, 0.3)) {
+    const m = b.mode as Extract<AiMode, { k: 'base' }>
+    if (b.arrived || b.steer(m.at, 0.3)) {
       b.arrived = true
-      b.inp.held.brake = true
+      b.inp.move.set(0, 0, 0)
+      if (Math.hypot(b.me.pos.x - m.at.x, b.me.pos.z - m.at.z) > 1.2) b.arrived = false
     }
   }
 }
@@ -194,9 +196,9 @@ class CoupleState extends State<Brain> {
     if (b.arrived || b.steer(p, 0.5)) {
       b.arrived = true
       b.inp.move.set(0, 0, 0)
-      // Mirror the player: hold Y only while they hold it on the plate.
+      // Mirror the player: hold Acción only while they hold it on the plate.
       const youOn = Math.hypot(b.you.pos.x - m.at.x, b.you.pos.z - m.at.z) < 2.4
-      b.inp.held.couple = youOn && b.you.coupleHold > 0.05
+      b.inp.held.context = youOn && b.you.coupleHold > 0.05
     }
   }
 }
@@ -249,8 +251,8 @@ export function companionMini(inp: StepInput, dt: number) {
   inp.move.set(0, 0, 0)
   inp.held.jump = false
   inp.held.grab = false
-  inp.held.brake = false
-  inp.held.couple = false
+  inp.held.context = false
+  inp.held.punch = false
   inp.aim.set(Math.sin(b.me.yaw), 0.3, Math.cos(b.me.yaw)).normalize()
   // Stuck detection (pushing into a wall).
   const moved = b.me.pos.distanceTo(b.lastPos)

@@ -264,15 +264,13 @@ table.controls td { padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07
 .t-btn { position: absolute; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; color: #fff; background: rgba(16, 24, 38, 0.42); border: 2.5px solid var(--tc, rgba(255, 255, 255, 0.5)); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25), 0 3px 10px rgba(0, 0, 0, 0.25); backdrop-filter: blur(2px); transition: transform 0.06s, background 0.06s; }
 .t-btn .t-glyph { font-size: calc(var(--L) * 0.3); line-height: 1; font-weight: 700; color: var(--tc); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
 .t-btn .t-label { font-size: max(10px, calc(var(--L) * 0.14)); font-weight: 600; margin-top: 2px; opacity: 0.9; letter-spacing: 0.02em; }
-.t-btn.t-a { --tc: #3ec46d; }
+.t-btn.t-a { --tc: #3ec46d; border-width: 3px; }
 .t-btn.t-a .t-glyph { font-size: calc(var(--L) * 0.4); }
-.t-btn.t-x { --tc: #4f9bff; }
-.t-btn.t-rt { --tc: var(--amber-soft); }
-.t-btn.t-lt { --tc: var(--cyan-soft); }
-.t-btn.t-b { --tc: #ff7a6b; }
-.t-btn.t-y { --tc: #f2c21d; }
-.t-btn.t-b .t-glyph, .t-btn.t-y .t-glyph { font-size: calc(var(--L) * 0.24); }
-.t-btn.t-b .t-label, .t-btn.t-y .t-label { font-size: max(9px, calc(var(--L) * 0.12)); }
+.t-btn.t-p { --tc: #ff5b4a; }
+.t-btn.t-g { --tc: #4f9bff; }
+.t-btn.t-c { --tc: #c46bff; }
+.t-btn.t-p .t-glyph, .t-btn.t-g .t-glyph, .t-btn.t-c .t-glyph { font-size: calc(var(--L) * 0.26); }
+.t-btn.t-p .t-label, .t-btn.t-g .t-label, .t-btn.t-c .t-label { font-size: max(9px, calc(var(--L) * 0.125)); }
 .t-btn.on { transform: scale(0.92); background: color-mix(in srgb, var(--tc) 45%, rgba(16, 24, 38, 0.5)); }
 .t-btn.hint::after, .t-mini.hint::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 3px solid var(--tc, #fff); animation: tHint 1.1s ease-out infinite; }
 @keyframes tHint { from { transform: scale(0.9); opacity: 0.9; } to { transform: scale(1.25); opacity: 0; } }

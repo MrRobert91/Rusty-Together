@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { World } from '@dimforge/rapier3d-compat'
-import { G, ballistic, clamp, dampAngle, fx, type Combined, type Anchor } from '../runtime'
+import { G, act, ballistic, clamp, dampAngle, fx, type Combined, type Anchor } from '../runtime'
 import { BIG, GRAVITY } from '../tuning'
 import { lineOfSight, newGroundHit, probeGround } from './physicsUtil'
 import { settings } from '../../core/settings'
@@ -10,20 +10,20 @@ import { toast } from '../hud'
 export interface PilotFrame {
   move: Vector3 // world XZ, |m| ≤ 1
   aim: Vector3 // world aim direction for this pilot's arm
-  brake: boolean
-  couple: boolean
   grab: boolean
-  /** Hook held: keeps the arm latched and reels it in. */
+  /** Contextual held: keeps the arm latched and reels it in (or asks to split). */
   reel: boolean
   /** Host-clock timestamps of presses that happened since the last step. */
   jumps: number[]
   xs: number[]
   /** Host-clock timestamps of hook releases (slingshot timing). */
   xr: number[]
+  /** Host-clock timestamps of punch presses. */
+  ps: number[]
   emote: number
 }
 
-export const newPilotFrame = (): PilotFrame => ({ move: new Vector3(), aim: new Vector3(0, 0, -1), brake: false, couple: false, grab: false, reel: false, jumps: [], xs: [], xr: [], emote: 0 })
+export const newPilotFrame = (): PilotFrame => ({ move: new Vector3(), aim: new Vector3(0, 0, -1), grab: false, reel: false, jumps: [], xs: [], xr: [], ps: [], emote: 0 })
 
 const gh = newGroundHit()
 const v = new Vector3()
@@ -144,10 +144,11 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
   const a0 = m0.length() > 0.15
   const a1 = m1.length() > 0.15
   B.legs[0].move.copy(m0); B.legs[1].move.copy(m1)
-  B.legs[0].anchored = P[0].brake; B.legs[1].anchored = P[1].brake
+  // A planted leg (no stick) is what the crab's pry reads as "anchoring".
+  B.legs[0].anchored = !a0 && B.grounded; B.legs[1].anchored = !a1 && B.grounded
   B.legs[0].push = m0.length(); B.legs[1].push = m1.length()
   let speed = 0
-  let turnRate = BIG.turnRate
+  const turnRate = BIG.turnRate
   avg.set(0, 0, 0)
   if (a0 && a1) {
     avg.copy(m0).add(m1).multiplyScalar(0.5)
@@ -160,11 +161,6 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
     speed = BIG.oneLegSpeed * Math.min(1, m.length())
     B.torsion = (a0 ? 0.35 : -0.35) * m.length()
   } else B.torsion = 0
-  // Anchoring one leg turns the other leg's push into a pivot.
-  const anchored0 = P[0].brake && B.grounded
-  const anchored1 = P[1].brake && B.grounded
-  if ((anchored0 && a1 && !a0) || (anchored1 && a0 && !a1)) { speed *= 0.3; turnRate = 9 }
-  if (anchored0 && anchored1) speed = 0
   // Hands on fixed handles hold the body in place; legs only lever.
   const holdingFixed = B.arms.some((a) => a.grip && !a.grip.startsWith('f'))
   if (holdingFixed) speed = 0
@@ -278,7 +274,7 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
     arm.aim.copy(pf.aim)
     shoulderPos(B, i, tmp2)
 
-    // RT grip on handles (crab front, fuse…).
+    // Grab: grip handles (crab front, fuse…).
     if (pf.grab) {
       if (!arm.grip) {
         let best: Anchor | null = null
@@ -297,16 +293,33 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
     }
     if (arm.grip && !G.anchors.get(arm.grip)?.enabled) arm.grip = null
 
+    // Punch: a short arm jab at a bell / button / enemy in reach.
+    for (const _pt of pf.ps) {
+      if (c.state !== 'idle' || arm.grip) continue
+      const a = pickBigPunch(B, tmp2)
+      c.state = 'flying'
+      c.punch = true
+      c.t = t
+      c.tip.copy(tmp2)
+      c.charge = 0
+      if (a) { c.anchorId = a.id; c.target.copy(a.pos); c.hit = true }
+      else { c.anchorId = null; c.target.copy(tmp2).addScaledVector(tmp.set(Math.sin(B.yaw), 0, Math.cos(B.yaw)), 2.4); c.hit = false }
+      fx('sfx', { n: 'whoosh', p: tmp2, v: 0.8 })
+    }
+    pf.ps.length = 0
+
+    // Contextual: only fires at a glowing hook target; with none it's a split request.
     for (const _xt of pf.xs) {
       if (c.state === 'idle' && !arm.grip) {
         const a = pickBigTarget(world, B, i, pf.aim)
+        if (!a) continue
         c.state = 'flying'
+        c.punch = false
         c.t = t
         c.tip.copy(tmp2)
         c.charge = 0
         bl.relT[i] = -9
-        if (a) { c.anchorId = a.id; c.target.copy(a.pos); c.hit = true }
-        else { c.anchorId = null; c.target.copy(tmp2).addScaledVector(pf.aim, BIG.armRange * 0.8); c.hit = false }
+        c.anchorId = a.id; c.target.copy(a.pos); c.hit = true
         fx('sfx', { n: 'cableFire', p: tmp2 })
       }
     }
@@ -328,6 +341,14 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
         c.tip.copy(c.target)
         const a = c.anchorId ? G.anchors.get(c.anchorId) : null
         if (!c.hit || !a || !a.enabled) { c.state = 'retract'; continue }
+        if (c.punch) {
+          fx('sfx', { n: 'bonk', p: a.pos })
+          fx('particles', { n: 'stars', p: a.pos })
+          if (a.kind === 'bell') act('bell', { id: a.id })
+          else act('punch', { id: a.id })
+          c.state = 'retract'
+          continue
+        }
         if (!holding) {
           // Tapped: a short tug toward the anchor, then the arm returns.
           tmp.copy(a.pos).sub(B.pos).normalize()
@@ -354,7 +375,7 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
       tmp.copy(tmp2).sub(c.tip)
       const d = tmp.length()
       const step = BIG.armSpeed * 1.3 * dt
-      if (d <= step) { c.state = 'idle'; c.anchorId = null; c.reeling = false }
+      if (d <= step) { c.state = 'idle'; c.anchorId = null; c.reeling = false; c.punch = false }
       else c.tip.addScaledVector(tmp, step / d)
       continue
     }
@@ -441,10 +462,27 @@ function fireSling(B: Combined, a: Anchor, t: number) {
   fx('sling', {})
 }
 
-/** Couple-out consent: both pilots hold Y on the ground. */
+/** Couple-out consent: both pilots hold the contextual button on the ground with a free arm. */
 export function bigWantsSplit(B: Combined, P: [PilotFrame, PilotFrame], dt: number) {
-  for (let i = 0; i < 2; i++) bl.coupleT[i] = P[i].couple && B.grounded ? bl.coupleT[i] + dt : 0
+  for (let i = 0; i < 2; i++) {
+    const free = B.arms[i].cable.state === 'idle' && !B.arms[i].grip
+    bl.coupleT[i] = P[i].reel && free && B.grounded ? bl.coupleT[i] + dt : 0
+  }
   return bl.coupleT
+}
+
+const BIG_PUNCH = new Set(['bell', 'button', 'enemy'])
+/** Nearest punchable thing within arm's reach of a shoulder. */
+export function pickBigPunch(B: Combined, shoulder: Vector3): Anchor | null {
+  let best: Anchor | null = null
+  let bd = BIG.punchRange
+  for (const a of G.anchors.values()) {
+    if (!a.enabled || !a.big || !BIG_PUNCH.has(a.kind)) continue
+    const d = a.pos.distanceTo(shoulder)
+    if (d < bd) { bd = d; best = a }
+  }
+  void B
+  return best
 }
 
 export function resetBigLocals() {

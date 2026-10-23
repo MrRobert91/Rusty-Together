@@ -9,20 +9,21 @@ import { setPaused } from './PauseMenu'
  * Mobile controls, laid out for two thumbs in landscape:
  *  - left half: floating stick that appears under the thumb,
  *  - right half: drag anywhere to look (or aim the arm when joined),
- *  - bottom-right: buttons on arcs around the big jump button, so the thumb
- *    rolls between them without looking. Sliding from one button onto another
- *    transfers the press (jump → grab to catch a hand mid-air); dragging off a
- *    button keeps it held and turns the camera.
+ *  - bottom-right: GameCube-style cluster. A big round jump button and three
+ *    round buttons hugging it from the left and above (Pegar where the GC «B»
+ *    sits, Agarrar up-left, Acción on top), so the thumb rolls between them
+ *    without looking. Sliding from one button onto another transfers the
+ *    press (jump → grab to catch a hand mid-air); dragging off a button keeps
+ *    it held and turns the camera.
  */
 
-interface BtnDef { b: Btn; label: string; size: number; angle: number; ring: 0 | 1 | 2; tone: string }
+interface BtnDef { b: Btn; label: string; size: number; angle: number; ring: 0 | 1; tone: string }
 
 const DEFS: BtnDef[] = [
   { b: 'jump', label: 'Saltar', size: 1, angle: 0, ring: 0, tone: 'a' },
-  { b: 'primary', label: 'Gancho', size: 0.86, angle: 168, ring: 1, tone: 'x' },
-  { b: 'grab', label: 'Agarrar', size: 0.78, angle: 100, ring: 1, tone: 'rt' },
-  { b: 'brake', label: 'Agachar', size: 0.62, angle: 180, ring: 2, tone: 'b' },
-  { b: 'couple', label: 'Unir', size: 0.62, angle: 138, ring: 2, tone: 'y' },
+  { b: 'punch', label: 'Pegar', size: 0.7, angle: 205, ring: 1, tone: 'p' },
+  { b: 'grab', label: 'Agarrar', size: 0.7, angle: 151, ring: 1, tone: 'g' },
+  { b: 'context', label: 'Acción', size: 0.7, angle: 98, ring: 1, tone: 'c' },
 ]
 
 const EMOTES: Btn[] = ['emote1', 'emote2', 'emote3', 'emote4']
@@ -65,14 +66,14 @@ export function TouchControls() {
   const stickR = Math.max(52, Math.min(78, vp.h * 0.16)) * scale
   const layout = useMemo(() => {
     const ins = safeInsets()
-    const cx = vp.w - ins.r - 20 - L / 2
-    const cy = vp.h - ins.b - 20 - L / 2
-    const gap = 0.12 * L
+    const r1 = L / 2 + 0.35 * L + 0.14 * L
+    // Keep the lowest satellite (Pegar, below A's centre line) on screen.
+    const low = Math.max(0, -Math.sin((205 * Math.PI) / 180) * r1 + 0.35 * L - L / 2)
+    const cx = vp.w - ins.r - 18 - L / 2
+    const cy = vp.h - ins.b - 16 - L / 2 - low
     const rects: Rect[] = DEFS.map((d) => {
       const s = d.size * L
-      const r1 = L / 2 + 0.39 * L + gap * 2.2
-      const r2 = r1 + 0.39 * L + s / 2 + gap
-      const dist = d.ring === 0 ? 0 : d.ring === 1 ? r1 : r2
+      const dist = d.ring === 0 ? 0 : r1
       const a = (d.angle * Math.PI) / 180
       return { b: d.b, x: cx + Math.cos(a) * dist, y: cy - Math.sin(a) * dist, r: s / 2 }
     })
@@ -240,7 +241,7 @@ export function TouchControls() {
       <div className="t-stick" ref={stickRef}><div className="t-knob" ref={knobRef} /></div>
       {DEFS.map((d) => {
         const r = layout.rects.find((x) => x.b === d.b)!
-        const label = form === 'joined' && d.b === 'couple' ? 'Separar' : form === 'joined' && d.b === 'jump' ? 'Salto' : d.label
+        const label = form === 'joined' && d.b === 'jump' ? 'Impulso' : d.label
         return (
           <div key={d.b} className={`t-btn t-${d.tone} ${held.has(d.b) ? 'on' : ''} ${hintBtns.has(d.b) ? 'hint' : ''}`}
             style={{ left: r.x - r.r, top: r.y - r.r, width: r.r * 2, height: r.r * 2 }}>

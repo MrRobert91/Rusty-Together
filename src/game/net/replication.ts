@@ -63,8 +63,8 @@ export interface MiniPose {
 
 export function encodeMini(m: Mini): MiniPose {
   const f =
-    (m.grounded ? 1 : 0) | (m.crouch ? 2 : 0) | (m.offering ? 4 : 0) | (m.hidden ? 8 : 0) | (m.dead ? 16 : 0) |
-    (m.cable.reeling ? 32 : 0) | (m.stunT > 0 ? 64 : 0) | (m.boosting > 0 ? 128 : 0) | (G.time < m.ghostT ? 256 : 0)
+    (m.grounded ? 1 : 0) | (m.towing ? 2 : 0) | (m.offering ? 4 : 0) | (m.hidden ? 8 : 0) | (m.dead ? 16 : 0) |
+    (m.cable.reeling ? 32 : 0) | (m.stunT > 0 ? 64 : 0) | (m.boosting > 0 ? 128 : 0) | (G.time < m.ghostT ? 256 : 0) | (m.cling ? 512 : 0) | (m.cable.punch ? 1024 : 0)
   // G.time runs on the shared host clock, so timestamps travel as-is.
   const rel = (x: number) => Math.round(x * 1000) / 1000
   return {
@@ -102,7 +102,9 @@ export function receiveMiniPose(m: Mini, d: MiniPose) {
   while (buf.length > 30) buf.shift()
   const f = d.f
   m.grounded = !!(f & 1)
-  m.crouch = !!(f & 2)
+  m.towing = !!(f & 2)
+  m.cling = !!(f & 512)
+  m.cable.punch = !!(f & 1024)
   m.offering = !!(f & 4)
   m.hidden = !!(f & 8)
   m.dead = !!(f & 16)

@@ -5,7 +5,7 @@ import { useVoice } from '../net/voice'
 import { currentDevice, deviceText, glyph, onDeviceChange, type Btn, type Device } from '../core/input'
 import { G, localSlot, peerSlot } from '../game/runtime'
 import { cameraRef } from '../game/CameraRig'
-import { SLOT_COLOR, SLOT_NAME } from '../game/tuning'
+import { BTN_COLOR, SLOT_COLOR, SLOT_NAME } from '../game/tuning'
 import { useApp } from './appStore'
 import { backToMenu, startSolo } from './App'
 import { lobbySend, useLobby } from '../net/online'
@@ -19,8 +19,10 @@ export function useDevice() {
 
 export function Key({ btn, device }: { btn: Btn; device: Device }) {
   const g = glyph(btn, device)
-  const padColor = device === 'pad' ? ({ A: '#3ec46d', B: '#e8483b', X: '#3a8cf0', Y: '#f2c21d' } as Record<string, string>)[g] : undefined
-  return <span className={`key ${device} ${g.length > 2 ? 'wide' : ''}`} style={padColor ? { background: padColor, color: '#10131a' } : undefined}>{g}</span>
+  // The four action buttons wear their colour everywhere (HUD, touch, world markers).
+  const c = (BTN_COLOR as Record<string, string>)[btn]
+  const style = c ? { background: c, color: '#0d1320', borderColor: c } : undefined
+  return <span className={`key ${device} ${g.length > 2 ? 'wide' : ''}`} style={style}>{g}</span>
 }
 
 export function Hud() {
