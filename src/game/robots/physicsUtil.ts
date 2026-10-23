@@ -68,3 +68,29 @@ export function raycastPoint(world: World, a: Vector3, dir: Vector3, max: number
   out.copy(a).addScaledVector(dir, h.timeOfImpact)
   return h.timeOfImpact
 }
+
+const wallRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })
+const wallN = new Vector3()
+/**
+ * Horizontal probe for a grippable wall (static, roughly vertical) at chest
+ * and knee height. Returns the wall normal (shared vector) or null; `out`
+ * receives the hit point.
+ */
+export function wallProbe(world: World, from: Vector3, dir: Vector3, max: number, exclude: RigidBody | null, out: Vector3): Vector3 | null {
+  const len = Math.hypot(dir.x, dir.z)
+  if (len < 1e-3) return null
+  let found = false
+  for (const dy of [0.2, -0.15]) {
+    wallRay.origin.x = from.x; wallRay.origin.y = from.y + dy; wallRay.origin.z = from.z
+    wallRay.dir.x = dir.x / len; wallRay.dir.y = 0; wallRay.dir.z = dir.z / len
+    const h = world.castRayAndGetNormal(wallRay, max, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, exclude ?? undefined,
+      (c) => { const b = c.parent(); return !!b && b.isFixed() && !(b.userData as any)?.robot && !(b.userData as any)?.noCling })
+    if (!h || Math.abs(h.normal.y) > 0.4) return null
+    if (!found) {
+      found = true
+      wallN.set(h.normal.x, 0, h.normal.z).normalize()
+      out.set(wallRay.origin.x + wallRay.dir.x * h.timeOfImpact, wallRay.origin.y, wallRay.origin.z + wallRay.dir.z * h.timeOfImpact)
+    }
+  }
+  return found ? wallN : null
+}

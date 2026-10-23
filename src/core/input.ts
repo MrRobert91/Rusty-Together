@@ -1,12 +1,14 @@
 import { settings } from './settings'
 
-/** Logical buttons, named after the GDD pad layout. */
+/**
+ * Logical buttons. Four action buttons, laid out like a GameCube pad: a big
+ * jump in the middle and the other three around it.
+ */
 export type Btn =
-  | 'jump' // A
-  | 'brake' // B
-  | 'primary' // RT / X – hook: hold to latch and reel in, release to let go
-  | 'couple' // Y  – hold to couple / decouple
-  | 'grab' // LT – grab / offer hand
+  | 'jump' // A  – jump / leg impulse
+  | 'grab' // B · LT – offer a hand, catch it, carry, cling to walls, drag your partner
+  | 'punch' // X – punch: partner, enemies, bells and buttons; throws a carried box
+  | 'context' // Y · RT – whatever glows violet: hook a ring, couple on a plate, split
   | 'signal' // RB – ping
   | 'camera' // LB
   | 'pause'
@@ -17,7 +19,7 @@ export type Btn =
   | 'talk'
   | 'mute'
 
-export const BTNS: Btn[] = ['jump', 'brake', 'primary', 'couple', 'grab', 'signal', 'camera', 'pause', 'emote1', 'emote2', 'emote3', 'emote4', 'talk', 'mute']
+export const BTNS: Btn[] = ['jump', 'grab', 'punch', 'context', 'signal', 'camera', 'pause', 'emote1', 'emote2', 'emote3', 'emote4', 'talk', 'mute']
 
 export type Device = 'kbm' | 'pad' | 'touch'
 
@@ -36,13 +38,11 @@ export interface InputFrame {
 
 const KEYMAP: Record<string, Btn> = {
   Space: 'jump',
-  ShiftLeft: 'brake',
-  ShiftRight: 'brake',
-  KeyC: 'brake',
-  KeyF: 'primary',
-  KeyR: 'couple',
   KeyE: 'grab',
-  KeyQ: 'grab',
+  ShiftLeft: 'grab',
+  KeyF: 'punch',
+  KeyQ: 'context',
+  KeyR: 'context',
   KeyG: 'signal',
   Escape: 'pause',
   KeyP: 'pause',
@@ -53,9 +53,9 @@ const KEYMAP: Record<string, Btn> = {
   KeyV: 'talk',
   KeyM: 'mute',
 }
-const MOUSEMAP: Record<number, Btn> = { 0: 'primary', 2: 'grab', 1: 'signal' }
+const MOUSEMAP: Record<number, Btn> = { 0: 'punch', 2: 'context', 1: 'signal' }
 const PADMAP: Record<number, Btn> = {
-  0: 'jump', 1: 'brake', 2: 'primary', 3: 'couple', 4: 'camera', 5: 'signal', 9: 'pause', 8: 'mute',
+  0: 'jump', 1: 'grab', 2: 'punch', 3: 'context', 4: 'camera', 5: 'signal', 9: 'pause', 8: 'mute',
   12: 'emote1', 13: 'emote2', 14: 'emote3', 15: 'emote4',
 }
 
@@ -221,9 +221,9 @@ export function pollInput(dt: number): InputFrame {
         if (on) used = true
         if (name && on) held[name] = true
       })
-      // Triggers carry the two "hold" verbs: RT hooks, LT grabs.
+      // Triggers carry the two "hold" verbs: RT = Acción (hook), LT = grab.
       if ((pad.buttons[6]?.value ?? 0) > 0.3) held.grab = true
-      if ((pad.buttons[7]?.value ?? 0) > 0.3) held.primary = true
+      if ((pad.buttons[7]?.value ?? 0) > 0.3) held.context = true
       if (used) setDevice('pad')
       if (Math.abs(l.x) + Math.abs(l.y) > Math.abs(mx) + Math.abs(my)) { mx = l.x; my = -l.y }
       const ps = 3.2 * s.stickSensitivity * dt
@@ -275,24 +275,24 @@ export function haptic(ms: number) {
 export function glyph(b: Btn, device: Device = lastDevice): string {
   if (device === 'touch') return TOUCH_GLYPH[b]
   if (device === 'pad') {
-    return ({ jump: 'A', brake: 'B', primary: 'RT', couple: 'Y', grab: 'LT', signal: 'RB', camera: 'LB', pause: '☰', emote1: '↑', emote2: '→', emote3: '↓', emote4: '←', talk: '—', mute: '⧉' } as Record<Btn, string>)[b]
+    return ({ jump: 'A', grab: 'B', punch: 'X', context: 'Y', signal: 'RB', camera: 'LB', pause: '☰', emote1: '↑', emote2: '→', emote3: '↓', emote4: '←', talk: '—', mute: '⧉' } as Record<Btn, string>)[b]
   }
-  return ({ jump: 'Espacio', brake: 'Shift', primary: 'Clic izq.', couple: 'R', grab: 'E', signal: 'G', camera: 'Ratón', pause: 'Esc', emote1: '1', emote2: '2', emote3: '3', emote4: '4', talk: 'V', mute: 'M' } as Record<Btn, string>)[b]
+  return ({ jump: 'Espacio', grab: 'E', punch: 'Clic izq', context: 'Clic der', signal: 'G', camera: 'Ratón', pause: 'Esc', emote1: '1', emote2: '2', emote3: '3', emote4: '4', talk: 'V', mute: 'M' } as Record<Btn, string>)[b]
 }
 
 /** Touch glyphs match the icons drawn on the on-screen buttons. */
 export const TOUCH_GLYPH: Record<Btn, string> = {
-  jump: '⤒', brake: '⤓', primary: '🪝', couple: '∞', grab: '✋', signal: '!', camera: '◎',
+  jump: '⤒', grab: '✋', punch: '👊', context: '✦', signal: '!', camera: '◎',
   pause: 'II', emote1: '👋', emote2: '👍', emote3: '❤', emote4: '😂', talk: '🎙', mute: '🔇',
 }
 
 /** Short verb shown next to each glyph when text names a button. */
-const VERB: Partial<Record<Btn, string>> = { jump: 'Saltar', brake: 'Agachar', primary: 'Gancho', couple: 'Unir', grab: 'Agarrar' }
+const VERB: Partial<Record<Btn, string>> = { jump: 'Saltar', grab: 'Agarrar', punch: 'Pegar', context: 'Acción' }
 
 /**
- * Level text names buttons with tokens such as `{primary}` or `{grab}`; they
+ * Level text names buttons with tokens such as `{context}` or `{grab}`; they
  * become the glyph of the device in use, so one string serves keyboard, pad
- * and touch (`{primary}` → «Clic izq.», «RT» or «🪝 Gancho»).
+ * and touch (`{context}` → «Clic der.», «Y» or «✦ Acción»).
  */
 export function deviceText(s: string, device: Device = lastDevice) {
   if (!s || s.indexOf('{') < 0) return s

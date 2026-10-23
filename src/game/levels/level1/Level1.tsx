@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Block, Banner, Pillar, Scaffold, Tree, HazardStrip } from '../../env/blocks'
-import { Beacon, Conveyor, CouplePlate, Crate, Gate, Ring, SafetyNet, Sign, Switch, Zone } from '../../env/interactive'
+import { Beacon, Conveyor, CouplePlate, Crate, Gate, PunchButton, Ring, SafetyNet, Sign, Switch, Zone } from '../../env/interactive'
 import { CraneBeam, Glass, GoldenNut, Seesaw, Wall } from '../../env/props2'
 import { defineCheckpoints, reachCheckpoint } from '../checkpoints'
 import { PresentationBridge, say, useHostLogic, useJoinedSafeZones } from '../common'
@@ -56,7 +56,7 @@ export function setupLevel1() {
 export function Level1() {
   useEffect(() => {
     say.room('1', 'Escuela de guantes', 'Separados')
-    say.objective('Subid al muro: uno se agacha ({brake}) para hacer de trampolín y el de arriba ofrece la mano ({grab}).')
+    say.objective('Subid al muro: uno salta sobre la cabeza del otro (trampolín) y el de arriba ofrece la mano ({grab}).')
     say.mood('explore')
   }, [])
   return (
@@ -106,13 +106,13 @@ function Room1() {
       <Block pos={[-13, 0, -5]} size={[5, 8, 7]} />
       <Ring id="r1_practice" pos={[-8.3, 3.7, -5]} mount="hang" big={false} />
       <SafetyNet pos={[-8.25, -1.6, -5]} size={[4.5, 7]} returnTo={[-4.5, 0, -5]} />
-      <Sign pos={[-5.2, 2.2, -8.6]} rotY={0.6} text="Práctica" sub="mantén el gancho · suelta" small />
+      <Sign pos={[-5.2, 2.2, -8.6]} rotY={0.6} text="Práctica" sub="mantén Acción · suelta" small />
       <GoldenNut id="n1" pos={[-13.5, 1.2, -5]} />
 
       {/* B: the wall (2.4 m) — springboard + offered hand */}
       <Block pos={[0, 2.4, -17]} size={[10, 10.4, 10]} />
       <HazardStrip pos={[0, 0.03, -11.6]} size={[10, 0.6]} />
-      <Sign pos={[-3.8, 1.8, -10.6]} rotY={0.2} text="¿Muy alto?" sub="agáchate: trampolín" small />
+      <Sign pos={[-3.8, 1.8, -10.6]} rotY={0.2} text="¿Muy alto?" sub="salta en su cabeza" small />
       <Sign pos={[3.8, 4.2, -12.6]} rotY={-0.2} text="Desde arriba" sub="en el borde: ofrece la mano" small />
 
       {/* Gap with a high ring: only reachable from a partner's springboard */}
@@ -174,8 +174,8 @@ function Room2() {
       <Sign pos={[-4.6, 4.2, -45.6]} rotY={Math.PI / 2} text="Tope" sub="abre la otra cinta" small post={false} />
 
       {/* The single fast charge: helps your lane, speeds up theirs (5 s) */}
-      <TurboPad side="L" pos={[-1.6, 2.42, -44.8]} />
-      <TurboPad side="R" pos={[1.6, 2.42, -44.8]} />
+      <TurboPad side="L" pos={[-1.4, 2.42, -44.8]} />
+      <TurboPad side="R" pos={[1.4, 2.42, -44.8]} />
 
       {/* Box sockets → lane doors */}
       <Switch id="sockL" pos={[-3, 2.42, -48.6]} radius={1.15} crates robots={false} color="#22c7d6" />
@@ -207,7 +207,7 @@ function Room2() {
 function TurboPad({ side, pos }: { side: 'L' | 'R'; pos: [number, number, number] }) {
   // The single fast charge only works after the first relay (GDD).
   useHostLogic(() => {
-    if (!G.vars.relay1 || G.vars.turboUsed || !G.vars[`sw:turbo${side}`]) return
+    if (!G.vars.relay1 || G.vars.turboUsed || !G.vars[`pb:turbo${side}`]) return
     hostSet('turboUsed', side)
     hostSet('turboT', G.time)
     // Your lane runs backwards (helps), theirs runs fast against them.
@@ -218,8 +218,9 @@ function TurboPad({ side, pos }: { side: 'L' | 'R'; pos: [number, number, number
   })
   return (
     <>
-      <Switch id={`turbo${side}`} pos={pos} radius={0.55} color="#ffd23a" />
-      <Sign pos={[pos[0] * 1.25, pos[1] + 1.4, pos[2]]} rotY={side === 'L' ? Math.PI / 2 : -Math.PI / 2} text="Carga rápida" sub="ventaja 5 s" small post={false} bg="#5a2d10" />
+      {/* Punch it once the first relay is done: one fast charge for the whole room. */}
+      <PunchButton id={`turbo${side}`} pos={pos} rotY={side === 'L' ? -Math.PI / 2 : Math.PI / 2} latch={false} holdS={0.5} />
+      <Sign pos={[pos[0] * 1.25, pos[1] + 2.4, pos[2]]} rotY={side === 'L' ? Math.PI / 2 : -Math.PI / 2} text="Carga rápida" sub="pégale · ventaja 5 s" small post={false} bg="#5a2d10" />
     </>
   )
 }
@@ -234,7 +235,7 @@ function Room4() {
       {/* E: coupling yard */}
       <Block pos={[0, 2.4, -74]} size={[14, 10.4, 16]} />
       <CouplePlate id="r4plate" pos={[0, 2.42, -74]} yaw={Math.PI} />
-      <Sign pos={[4.8, 4.6, -71]} rotY={-0.4} text="Primer cuerpo" sub="mantened Unir juntos" />
+      <Sign pos={[4.8, 4.6, -71]} rotY={-0.4} text="Primer cuerpo" sub="mantened Acción juntos" />
       <Tree pos={[-5.5, 2.4, -79]} s={1.2} />
       <Banner pos={[6.8, 5.6, -79]} rotY={-Math.PI / 2} />
       <CargoStack pos={[5.2, 2.4, -79.6]} rotY={Math.PI / 2} cols={2} layers={2} seed={21} />
@@ -461,7 +462,7 @@ function Story() {
     if (lead < -67) once('r4', () => {
       say.room('4', 'Primer cuerpo', 'Unidos')
       reachCheckpoint('c4')
-      say.objective('Subid a la placa y mantened {couple} los dos para acoplaros.')
+      say.objective('Subid a la placa y mantened {context} los dos para acoplaros.')
     })
     if (G.form === 'joined' && G.big.pos.z > -90) once('r4walk', () => say.objective('Cada uno mueve su pierna. Un salto unilateral ({jump}) basta para el primer hueco; para los siguientes, {jump} a la vez.'))
 
@@ -470,11 +471,11 @@ function Story() {
       reachCheckpoint('c5')
       say.room('5', 'Pasamanos de grúas', 'Unidos')
       say.mood('tension')
-      say.objective('Cruzad el balancín y avanzad de anillo en anillo: un brazo sujeta mientras el otro se lanza (mantened {primary} cada uno).')
+      say.objective('Cruzad el balancín y avanzad de anillo en anillo: un brazo sujeta mientras el otro se lanza (mantened {context} cada uno cuando el anillo brille).')
     })
     if (G.form === 'joined' && G.big.pos.z < -153.2 && G.big.grounded && G.big.pos.y > 3) once('r5b', () => {
       reachCheckpoint('c5b')
-      say.objective('Tirachinas: mantened el gancho ({primary}) en los dos anillos hasta tensar al máximo y soltad a la vez.')
+      say.objective('Tirachinas: mantened {context} con los dos brazos en los anillos hasta tensar al máximo y soltad a la vez.')
     })
     if (G.form === 'split' && lead < -114) once('r5split', () => say.toast('Los pasamanos necesitan brazos de 8 m: volved a uniros en la placa.', 'warn'))
   })

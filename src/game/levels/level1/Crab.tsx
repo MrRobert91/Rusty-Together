@@ -110,11 +110,32 @@ export function CrabRoom() {
     hE: addAnchor({ id: 'hE', kind: 'handle', pos: new THREE.Vector3(1.05, 5.3, -181.3), mini: false, enabled: false }),
     fW: addAnchor({ id: 'fW', kind: 'handle', pos: new THREE.Vector3(), mini: false, enabled: false }),
     fE: addAnchor({ id: 'fE', kind: 'handle', pos: new THREE.Vector3(), mini: false, enabled: false }),
+    // Its visor: punch it while a claw winds up and the sweep is cancelled.
+    face: addAnchor({ id: 'crabFace', kind: 'enemy', pos: new THREE.Vector3(CRAB_HOME.x, FLOOR + 2.25, CRAB_HOME.z + 2.35), mini: true, big: true, enabled: false }),
   }), [])
   useEffect(() => {
     Object.values(anchors).forEach((a) => G.anchors.set(a.id, a))
-    return () => Object.values(anchors).forEach((a) => G.anchors.delete(a.id))
-  }, [anchors])
+    G.punchHandlers.set('crabFace', () => {
+      const p = brain.phase
+      fx('sfx', { n: 'bonk', p: anchors.face.pos })
+      fx('particles', { n: 'stars', p: anchors.face.pos })
+      fx('shake', { a: 0.15 })
+      hostSet('crabHurtT', G.time)
+      if (p === 'warnW' || p === 'warnE' || p === 'idle') {
+        // Parried: the claw drops and the crab resets its cycle.
+        brain.go('idle')
+        G.stats.parries = (G.stats.parries ?? 0) + 1
+        if (G.stats.parries === 1) say.toast('¡Golpe al visor! El cangrejo pierde el ritmo y cancela el barrido.', 'good')
+      }
+    })
+    return () => { Object.values(anchors).forEach((a) => G.anchors.delete(a.id)); G.punchHandlers.delete('crabFace') }
+  }, [anchors, brain])
+
+  // The visor is punchable while the crab works the floor (phase A), on every client.
+  useFrame(() => {
+    const ph = G.vars.crab as Phase | undefined
+    anchors.face.enabled = ph === 'idle' || ph === 'warnW' || ph === 'warnE' || ph === 'sweepW' || ph === 'sweepE'
+  })
 
   /* ------------------------------------------------ host logic */
   useHostLogic((dt) => {
@@ -130,14 +151,14 @@ export function CrabRoom() {
       reachCheckpoint('c6')
       say.room('6', 'Cangrejo clasificador', 'Clímax · ambas formas')
       say.mood('boss')
-      setObjective(s, G.form === 'joined' ? 'Separaos (mantened {couple}) para alcanzar los pestillos laterales.' : 'Enganchad cada uno un pestillo y mantened el gancho ({primary}) para arrastrarlo a la cinta.')
+      setObjective(s, G.form === 'joined' ? 'Separaos (mantened {context}) para alcanzar los pestillos laterales.' : 'Enganchad cada uno un pestillo y mantened el gancho ({context}) para arrastrarlo a la cinta.')
       brain.go('idle')
     }
     brain.fsm.update()
 
     const calibW = !!G.vars.calibW
     const calibE = !!G.vars.calibE
-    if (s.started && phase !== 'stunned' && !calibW && !calibE && G.form === 'split') setObjective(s, 'Enganchad cada uno un pestillo y mantened el gancho ({primary}) para arrastrarlo a la cinta. ¡Ojo a las pinzas!')
+    if (s.started && phase !== 'stunned' && !calibW && !calibE && G.form === 'split') setObjective(s, 'Enganchad cada uno un pestillo y mantened el gancho ({context}) para arrastrarlo a la cinta. ¡Ojo a las pinzas!')
 
     /* ---- Phase A: latches ---- */
     for (const side of ['W', 'E'] as const) {
@@ -442,7 +463,8 @@ function CrabModel() {
     lm.emissive.set(alarm ? '#ff3a1a' : stunned ? '#ffd23a' : down ? '#5dff8a' : '#ff9a1f')
     lm.emissiveIntensity = alarm ? 2 + Math.sin(t * 25) * 1.5 : 1.2
     const look = G.form === 'joined' ? G.big.pos : G.minis[localSlot()].pos
-    face.draw(down ? 'happy' : stunned ? 'dizzy' : alarm ? 'determined' : 'normal', THREE.MathUtils.clamp((look.x - p.x) / 10, -1, 1), 0)
+    const hurt = G.time - ((G.vars.crabHurtT as number | undefined) ?? -9) < 0.7
+    face.draw(down ? 'happy' : stunned || hurt ? 'dizzy' : alarm ? 'determined' : 'normal', THREE.MathUtils.clamp((look.x - p.x) / 10, -1, 1), 0)
   })
 
   const shell = M.accent('#efe4cc')
@@ -521,9 +543,8 @@ export function CrabPrompts() {
       const h = G.vars.pryHint as number | undefined
       if (h !== undefined && h >= 0) {
         const other = 1 - h
-        prompt({ id: 'pry', text: h === me ? `Tú anclas (mantén B) · ${SLOT_NAME[other]} tira con su stick` : `${SLOT_NAME[h]} ancla · tú tira con el stick`, progress: ((G.vars.pry as number) ?? 0) / 2 })
-        prompt({ id: 'prykey', btn: h === me ? 'brake' : 'jump', text: h === me ? 'Anclar pierna' : '(stick hacia fuera)' })
-      } else if (h === -2) prompt({ id: 'pry0', btn: 'brake', text: 'Uno ancla ({brake}) mientras el otro tira con su stick' })
+        prompt({ id: 'pry', text: h === me ? `Tú anclas: suelta tu stick · ${SLOT_NAME[other]} tira con el suyo` : `${SLOT_NAME[h]} ancla · tú tira con el stick hacia fuera`, progress: ((G.vars.pry as number) ?? 0) / 2 })
+      } else if (h === -2) prompt({ id: 'pry0', text: 'Uno ancla (sin mover su stick) mientras el otro tira con el suyo' })
     }
     if (G.form === 'joined' && G.vars.fuse === 'carried') prompt({ id: 'fusecarry', btn: 'grab', hold: true, text: 'No sueltes el fusible' })
     if (G.form === 'joined' && G.vars.fuse === 'dropped') prompt({ id: 'fusegrab', btn: 'grab', hold: true, text: 'Agarrad el fusible los dos' })

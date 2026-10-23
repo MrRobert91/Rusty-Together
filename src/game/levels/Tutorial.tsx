@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Block, Banner, Scaffold, Tree, HazardStrip } from '../env/blocks'
-import { Beacon, CouplePlate, Crate, Gate, Ring, SafetyNet, Sign, Switch } from '../env/interactive'
+import { Beacon, CouplePlate, Crate, Gate, PunchButton, Ring, SafetyNet, Sign, Switch } from '../env/interactive'
 import { defineCheckpoints, reachCheckpoint } from './checkpoints'
 import { PresentationBridge, say, useHostLogic, useJoinedSafeZones } from './common'
 import { G, fx, localMini } from '../runtime'
@@ -45,31 +45,32 @@ export function setupTutorial() {
   aiDriver.pilot = (rp, lp) => companionPilot(rp, lp)
 }
 
-type Step = 'move' | 'jump' | 'high' | 'box' | 'swing' | 'spring' | 'meet' | 'boost' | 'hand' | 'cross' | 'catch' | 'couple' | 'walk' | 'hop' | 'joint' | 'sling' | 'split' | 'done'
+type Step = 'move' | 'jump' | 'high' | 'box' | 'punch' | 'swing' | 'spring' | 'meet' | 'boost' | 'hand' | 'cross' | 'catch' | 'couple' | 'walk' | 'hop' | 'joint' | 'sling' | 'split' | 'done'
 
 const OBJ: Record<Step, string> = {
   move: 'Camina hasta el borde de la pasarela (WASD / stick izquierdo). Mira con el ratón.',
   jump: 'Salta el hueco ({jump}). Si caes, la red te devuelve.',
   high: 'Mantén el salto para llegar más alto y sube al escalón.',
   box: 'Coge la caja ({grab}), déjala sobre el botón y cruza la puerta.',
-  swing: 'Apunta al anillo y mantén el gancho ({primary}): te engancha y te recoge. Balancéate y suelta al final del arco.',
-  spring: 'Mantén el gancho ({primary}) en el anillo del muro: al recogerlo del todo se carga el muelle… ¡suelta y sal disparado!',
-  meet: 'Despierta a Ámbar-bot.',
-  boost: 'Ámbar se agacha: salta sobre su cabeza para usarla de trampolín y sube al muro.',
+  punch: 'Pega al botón rojo ({punch}) para abrir la reja. Lo que brilla en rojo se golpea.',
+  swing: 'Mira al anillo: cuando brille en violeta, mantén {context}. Te engancha y te recoge; balancéate y suelta al final del arco.',
+  spring: 'Mantén {context} en el anillo del muro: al recogerlo del todo se carga el muelle… ¡suelta y sal disparado!',
+  meet: 'Ámbar-bot está dormido: despiértalo con un toque ({punch}).',
+  boost: 'Salta sobre la cabeza de Ámbar: rebotarás como en un trampolín hasta lo alto del muro.',
   hand: 'Arriba, ponte en el borde mirando a Ámbar y mantén {grab} para ofrecerle la mano.',
   cross: 'Ámbar cruza primero y te ofrece la mano…',
-  catch: 'Salta hacia Ámbar y agarra su mano en el aire ({grab}). También puedes lanzarle el gancho ({primary}).',
-  couple: 'Subid juntos a la placa y mantened {couple} para acoplaros.',
+  catch: 'Salta hacia Ámbar y agarra su mano en el aire ({grab}). También puedes engancharla con {context} cuando brille.',
+  couple: 'Subid juntos a la placa y mantened {context} para acoplaros.',
   walk: 'Unidos: tu stick mueve tu pierna izquierda. Ámbar te sigue el paso. Caminad hasta el primer hueco.',
   hop: 'Pulsa {jump} tú solo: un bote unilateral basta para este hueco pequeño.',
   joint: 'Ahora Ámbar saltará contigo: pulsad {jump} a la vez para el salto conjunto.',
-  sling: 'Mantened el gancho ({primary}) en los dos anillos hasta tensar al máximo… y soltad a la vez.',
-  split: 'Mantened {couple} para separaros sobre suelo ancho.',
+  sling: 'Mantened {context} con los dos brazos en los anillos hasta tensar al máximo… y soltad a la vez.',
+  split: 'Mantened {context} sobre suelo ancho, sin anillos a la vista, para separaros.',
   done: '¡Taller completado!',
 }
 
 export function Tutorial() {
-  const st = useRef({ step: 'move' as Step, t: 0, said: new Set<string>() })
+  const st = useRef({ step: 'move' as Step, t: 0, t2: 0, said: new Set<string>() })
 
   useEffect(() => {
     setMusic('explore')
@@ -110,24 +111,37 @@ export function Tutorial() {
         break
       case 'box':
         if (G.vars['sw:t_box']) once('boxok', () => say.toast('¡Puerta abierta! El peso de la caja mantiene el botón.', 'good'))
-        if (p.z < -33 && me.grounded) { reachCheckpoint('t3'); go('swing') }
+        if (p.z < -33 && me.grounded) { reachCheckpoint('t3'); go('punch') }
+        break
+      case 'punch':
+        if (G.vars['pb:t_gate']) {
+          once('punchok', () => say.toast('¡Bien! Con {punch} también empujas a tu compañero o golpeas enemigos.', 'good'))
+          go('swing')
+        }
         break
       case 'swing':
         if (me.cable.state === 'attached') once('reelhint', () => say.toast('Balancéate con el stick y suelta el gancho al final del arco (o salta con {jump}).', 'info'))
         if (p.z < -45 && me.grounded && feet > 0.5) { reachCheckpoint('t4'); go('spring'); G.medals.add('tutorial') }
         break
       case 'spring':
-        if (feet > 4.5 && me.grounded) { reachCheckpoint('t5'); go('meet') }
+        if (feet > 4.5 && me.grounded) {
+          reachCheckpoint('t5')
+          say.toast('Truco: en el aire contra un muro, mantén {grab} para agarrarte a él; salta para impulsarte.', 'info', 4200)
+          go('meet')
+        }
         break
       case 'meet':
-        if (p.distanceTo(bot.pos) < 4.5) {
-          brain.setMode({ k: 'crouch', at: V(1.0, 5, -67.4) })
+        // Wake it with a punch (or just stand next to it for a while).
+        if (p.distanceTo(bot.pos) < 4.5) s.t2 += dt
+        if ((bot.protectT > 0 && p.distanceTo(bot.pos) < 4) || s.t2 > 7) {
+          brain.setMode({ k: 'base', at: V(1.0, 5, -67.4) })
           say.sub('Ámbar-bot', '¡Bip-bip! (¡Hola, Cian! ¿Me ayudas a subir?)', '#ffd27a')
           bot.emote = 1
           bot.emoteT = G.time
           fx('sfx', { n: 'beepAmber', p: bot.pos })
           useHud.getState().set({ roomTitle: null })
           say.room('5', 'Ámbar-bot', 'Cooperación')
+          say.toast('Junto a Ámbar, mantén {grab} para agarrarlo y llevarlo a rastras.', 'info', 3600)
           go('boost')
         }
         break
@@ -229,11 +243,13 @@ export function Tutorial() {
       <Sign pos={[-2.2, 3, -30.6]} text="Caja aquí" sub="coge la caja" small />
       <Gate pos={[0, 1, -31.7]} size={[7.6, 2.8, 0.5]} openVar="sw:t_box" />
 
-      {/* T4 swing */}
+      {/* T4 punch button gate, then the swing */}
       <Block pos={[0, 1, -36]} size={[8, 9, 8]} />
+      <PunchButton id="t_gate" pos={[-2.9, 1, -36.2]} rotY={Math.PI / 2} label="¡Pégale!" />
+      <Gate pos={[0, 1, -38.4]} size={[7.6, 2.8, 0.5]} openVar="pb:t_gate" color="#ff5b4a" />
       <Ring id="t_swing" pos={[0, 4.4, -42.2]} mount="hang" big={false} />
       <SafetyNet pos={[0, -1, -42]} size={[8, 4]} returnTo={[0, 1, -38]} />
-      <Sign pos={[3.2, 3.2, -38.5]} rotY={-0.4} text="Gancho" sub="mantén para engancharte" small />
+      <Sign pos={[3.2, 3.2, -39.2]} rotY={-0.4} text="Acción" sub="mantén cuando brille" small />
       <Block pos={[0, 1, -49.75]} size={[8, 9, 11.5]} />
 
       {/* T5 spring launch up the cliff */}
@@ -245,7 +261,7 @@ export function Tutorial() {
 
       {/* T6 springboard wall + hand */}
       <Block pos={[0, 7.4, -75]} size={[10, 15, 13]} />
-      <Sign pos={[-3.2, 7.2, -66.8]} text="Trampolín" sub="salta sobre Ámbar agachado" small />
+      <Sign pos={[-3.2, 7.2, -66.8]} text="Trampolín" sub="salta sobre su cabeza" small />
       <Banner pos={[4.6, 10.4, -69]} rotY={0} />
 
       {/* T7 reverse: bot crosses, you catch its hand */}
@@ -253,13 +269,13 @@ export function Tutorial() {
       <SafetyNet pos={[0, 4.8, -83.3]} size={[10, 3.6]} returnTo={[0, 7.4, -79.5]} />
       <Block pos={[0, 7.4, -91]} size={[10, 15, 12]} />
       <CouplePlate id="t_plate" pos={[0, 7.42, -91.5]} yaw={Math.PI} />
-      <Sign pos={[4, 9.6, -90]} rotY={-0.5} text="Placa de unión" sub="mantened Y juntos" small />
+      <Sign pos={[4, 9.6, -90]} rotY={-0.5} text="Placa de unión" sub="mantened Acción juntos" small />
 
       {/* T8 joined: hop gap (1.2 m), joint gap (3 m) */}
       <Block pos={[0, 7.4, -101.2]} size={[7, 14, 6]} />
       <Block pos={[0, 7.4, -110.2]} size={[7, 14, 6]} />
       <Sign pos={[4.2, 9.6, -99.5]} rotY={-0.6} text="Bote" sub="un solo impulso" small />
-      <Sign pos={[4.2, 9.6, -108.5]} rotY={-0.6} text="Conjunto" sub="A a la vez" small />
+      <Sign pos={[4.2, 9.6, -108.5]} rotY={-0.6} text="Conjunto" sub="saltad a la vez" small />
 
       {/* T9 slingshot to the finish */}
       <Ring id="t_slingL" pos={[1.7, 12.2, -114.2]} mount="hang" mini={false} sling={{ group: 'tsl', to: V(0, 7.4, -127), time: 1.5 }} />

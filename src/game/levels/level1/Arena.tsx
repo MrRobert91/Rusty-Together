@@ -16,7 +16,7 @@ import { sfx } from '../../../core/audio'
 /*
  * Carrera de muelles (GDD room 3): optional one-minute arena. Double consent
  * to enter, two 20 s rounds with swapped starts, your own bells to ring,
- * playful shoves allowed (the shove costs the same cable you'd use to score).
+ * playful shoves allowed (punch your bells, punch each other).
  * Ties allowed; the winner only gets a session sticker.
  */
 

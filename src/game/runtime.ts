@@ -11,21 +11,39 @@ export const arr = (v: Vector3, p = 100): V3T => [Math.round(v.x * p) / p, Math.
 
 /* ------------------------------------------------------------ Anchors */
 
-export type AnchorKind = 'ring' | 'glove' | 'latch' | 'bell' | 'handle' | 'robot'
+/** `button` and `enemy` are punch targets; the rest are hook / grip points. */
+export type AnchorKind = 'ring' | 'glove' | 'latch' | 'bell' | 'handle' | 'robot' | 'button' | 'enemy'
 
 export interface Anchor {
   id: string
   kind: AnchorKind
   pos: Vector3
   enabled: boolean
-  mini: boolean // reachable by the mini cable fist (4 m)
+  mini: boolean // reachable by the mini hook (4 m) or punch
   big: boolean // reachable by the joined body telescopic arm (8 m)
-  /** Slingshot pair: when both arms hang from the same group at full tension, a double X launches. */
+  /** Slingshot pair: when both arms hang from the same group at full tension, releasing both hooks launches. */
   sling?: { group: string; to: Vector3; time: number }
   /** Arena bells belong to one player. */
   owner?: Slot
   /** Visual hint timestamps per slot (targeted this frame). */
   hot: [number, number]
+}
+
+/* ------------------------------------------------------------ Couple plates */
+
+/** Plates where the minis can couple. Registered by levels. */
+export interface Plate { id: string; pos: Vector3; radius: number; yaw: number; enabled: () => boolean }
+export const plates = new Map<string, Plate>()
+
+/** Standing on the plate (feet within reach of its surface). */
+export function onPlate(m: { pos: Vector3; hidden: boolean; dead: boolean }, p: Plate) {
+  return !m.hidden && !m.dead && Math.hypot(m.pos.x - p.pos.x, m.pos.z - p.pos.z) < p.radius && Math.abs(m.pos.y - 0.5 - p.pos.y) < 1.2
+}
+
+/** The enabled plate this robot stands on, if any. */
+export function plateUnder(m: { pos: Vector3; hidden: boolean; dead: boolean }) {
+  for (const p of plates.values()) if (p.enabled() && onPlate(m, p)) return p
+  return null
 }
 
 /* ------------------------------------------------------------ Robots */
@@ -43,9 +61,11 @@ export interface Cable {
   hit: boolean
   reeling: boolean
   charge: number
+  /** A punch jab: flies out, hits whatever it reached and comes back (never latches). */
+  punch: boolean
 }
 
-export const newCable = (): Cable => ({ state: 'idle', tip: new Vector3(), target: new Vector3(), anchorId: null, len: 0, t: 0, hit: false, reeling: false, charge: 0 })
+export const newCable = (): Cable => ({ state: 'idle', tip: new Vector3(), target: new Vector3(), anchorId: null, len: 0, t: 0, hit: false, reeling: false, charge: 0, punch: false })
 
 export type MiniKind = 'local' | 'ai' | 'remote'
 
@@ -58,15 +78,24 @@ export class Mini {
   vel = new Vector3()
   yaw = 0
   grounded = true
-  crouch = false
   offering = false
+  /** Holding the partner's body with grab: they get dragged along. */
+  towing = false
+  /** Gripping a wall with grab (in the air). */
+  cling = false
+  clingT = 0
+  clingN = new Vector3()
+  /** Last punch (animation + cooldown). */
+  punchT = -9
+  /** When the partner last sprang off our head (squash). */
+  stompT = -9
   glove = new Vector3()
   hangOn = -1 // slot whose glove we hang from
   hangT = 0
   hoist = 0 // 0..1 progress of hoisting the partner who hangs from us
   carrying: string | null = null
   cable: Cable = newCable()
-  coupleHold = 0 // seconds Y held while standing on a couple plate
+  coupleHold = 0 // seconds the contextual button was held while standing on a couple plate
   wantSplit = 0
   emote = 0
   emoteT = 0
@@ -95,24 +124,13 @@ export class Mini {
 
 export interface Arm {
   cable: Cable
-  /** Handle id gripped with RT (hand IK target), or null. */
+  /** Handle id gripped with grab (hand IK target), or null. */
   grip: string | null
   aim: Vector3
   aimYaw: number
   aimPitch: number
 }
 
-export interface PilotIntent {
-  move: { x: number; y: number }
-  brake: boolean
-  couple: boolean
-  grab: boolean
-  reel: boolean
-  aimYaw: number
-  aimPitch: number
-}
-
-export const newIntent = (): PilotIntent => ({ move: { x: 0, y: 0 }, brake: false, couple: false, grab: false, reel: false, aimYaw: 0, aimPitch: 0 })
 
 /** The joined body. Simulated on the host; replicated to the guest. */
 export class Combined {
@@ -131,7 +149,6 @@ export class Combined {
     { cable: newCable(), grip: null, aim: new Vector3(0, 0, -1), aimYaw: 0, aimPitch: 0 },
     { cable: newCable(), grip: null, aim: new Vector3(0, 0, -1), aimYaw: 0, aimPitch: 0 },
   ]
-  intents: [PilotIntent, PilotIntent] = [newIntent(), newIntent()]
   /** Last jump press per pilot (host clock) for the joint jump window. */
   jumpPress: [number, number] = [-9, -9]
   xPress: [number, number] = [-9, -9]
@@ -204,10 +221,12 @@ export const G = {
   paused: false,
   killY: -18,
   fx: new Map<string, Set<FxHandler>>(),
-  stats: { falls: 0, rescues: [0, 0], jointJumps: 0, rings: 0, start: 0, bells: [0, 0], arenaWins: [0, 0], boxesShared: 0, ringChain: 0, bestChain: 0 },
+  stats: { falls: 0, rescues: [0, 0], jointJumps: 0, rings: 0, start: 0, bells: [0, 0], arenaWins: [0, 0], boxesShared: 0, ringChain: 0, bestChain: 0, parries: 0 },
   medals: new Set<string>(),
   hostLogic: [] as Array<(dt: number) => void>,
   actHandlers: new Map<string, (slot: Slot, d: any) => void>(),
+  /** Host-side reactions to a punch landing on a `button` / `enemy` anchor, by anchor id. */
+  punchHandlers: new Map<string, (slot: Slot) => void>(),
 }
 
 export const isHost = () => !!G.session?.isHost
@@ -231,7 +250,7 @@ export function resetRuntime(level: string, session: Session) {
   G.time = 0
   G.paused = false
   G.killY = -18
-  G.stats = { falls: 0, rescues: [0, 0], jointJumps: 0, rings: 0, start: performance.now(), bells: [0, 0], arenaWins: [0, 0], boxesShared: 0, ringChain: 0, bestChain: 0 }
+  G.stats = { falls: 0, rescues: [0, 0], jointJumps: 0, rings: 0, start: performance.now(), bells: [0, 0], arenaWins: [0, 0], boxesShared: 0, ringChain: 0, bestChain: 0, parries: 0 }
   G.medals = new Set()
   G.hostLogic = []
   G.actHandlers.clear()

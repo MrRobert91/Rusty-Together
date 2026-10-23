@@ -5,7 +5,7 @@ import * as RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type { World } from '@dimforge/rapier3d-compat'
 import {
-  G, act, camRelative, clamp, fx, isHost, localMini, localSlot, onAct, peerMini, peerSlot, type Mini,
+  G, act, camRelative, clamp, fx, isHost, localMini, localSlot, onAct, onPlate, peerMini, peerSlot, plates, type Mini, type Plate,
 } from './runtime'
 import { consumeHuman, newStepInput, pollHuman, clearEdges, human, type StepInput } from './control'
 import { applyHit, carryPoint, respawnMini, stepMini } from './robots/miniController'
@@ -20,9 +20,7 @@ import { sfx, stinger } from '../core/audio'
 import { useHud, toast } from './hud'
 import { lineOfSight } from './robots/physicsUtil'
 
-/** Plates where the minis can couple. Registered by levels. */
-export interface Plate { id: string; pos: THREE.Vector3; radius: number; yaw: number; enabled: () => boolean }
-export const plates = new Map<string, Plate>()
+export { plates, type Plate } from './runtime'
 
 /** Optional AI driver for the solo partner (tutorial). */
 export const aiDriver: { mini: ((inp: StepInput, dt: number) => void) | null; pilot: ((pf: PilotFrame, local: PilotFrame, dt: number) => void) | null } = { mini: null, pilot: null }
@@ -59,13 +57,12 @@ function pilotAim(out: THREE.Vector3) {
 function fillLocalPilot(pf: PilotFrame, inp: StepInput) {
   camRelative(inp.stick, G.cam.yaw, pf.move)
   pilotAim(pf.aim)
-  pf.brake = inp.held.brake
-  pf.couple = inp.held.couple
   pf.grab = inp.held.grab
-  pf.reel = inp.held.primary
+  pf.reel = inp.held.context
   if (inp.pressed.jump) pf.jumps.push(G.time)
-  if (inp.pressed.primary) pf.xs.push(G.time)
-  if (inp.released.primary) pf.xr.push(G.time)
+  if (inp.pressed.context) pf.xs.push(G.time)
+  if (inp.released.context) pf.xr.push(G.time)
+  if (inp.pressed.punch) pf.ps.push(G.time)
 }
 
 export function Simulation() {
@@ -85,14 +82,13 @@ export function Simulation() {
     offs.push(s.on('in', (d: any) => {
       remotePilot.move.set(d.m[0], 0, d.m[1])
       remotePilot.aim.set(d.a[0], d.a[1], d.a[2])
-      remotePilot.brake = !!d.b
-      remotePilot.couple = !!d.c
       remotePilot.grab = !!d.g
       remotePilot.reel = !!d.r
     }))
     offs.push(s.on('pj', (d: { t: number }) => remotePilot.jumps.push(Math.min(d.t, s.hostTime()))))
     offs.push(s.on('px', (d: { t: number }) => remotePilot.xs.push(Math.min(d.t, s.hostTime()))))
     offs.push(s.on('pxr', (d: { t: number }) => remotePilot.xr.push(Math.min(d.t, s.hostTime()))))
+    offs.push(s.on('pp', (d: { t: number }) => remotePilot.ps.push(Math.min(d.t, s.hostTime()))))
     offs.push(s.on('pause', (d: { on: boolean }) => { G.paused = d.on; useHud.setState({ paused: d.on }) }))
 
     // Generic host interactions: boxes and rescues.
@@ -118,6 +114,7 @@ export function Simulation() {
       nb.body.setAngvel({ x: (Math.random() - 0.5) * 3, y: (Math.random() - 0.5) * 3, z: 0 }, true)
     }))
     offs.push(s.on('deny', (d: { id: string }) => { if (localMini().carrying === d.id) localMini().carrying = null }))
+    offs.push(onAct('punch', (slot, d: { id: string }) => G.punchHandlers.get(d.id)?.(slot)))
     offs.push(onAct('rescue', (_slot, d) => {
       G.stats.rescues[d.holder as 0 | 1]++
       if (G.stats.rescues[0] > 0 && G.stats.rescues[1] > 0 && !G.medals.has('rescue')) {
@@ -171,17 +168,20 @@ export function Simulation() {
 
     if (useHud.getState().levelDone) { localIn.move.set(0, 0, 0); clearEdges(localIn) }
 
-    // Gloves are anchors for the partner's cable fist.
+    // Gloves are anchors for the partner's hook.
     for (const m of G.minis) {
       const a = G.anchors.get(`glove:${m.slot}`)
       if (a) { a.pos.copy(m.glove); a.enabled = m.offering && !m.hidden }
     }
 
     // Robots stop pushing each other while one hangs from the other's hand.
+    // Online, a remote partner landing on our head is resolved on *their*
+    // client (they bounce); here its kinematic proxy would just shove us.
+    const stacked = other.kind === 'remote' && !other.hidden && other.pos.y > me.pos.y + 0.55 && Math.hypot(other.pos.x - me.pos.x, other.pos.z - me.pos.z) < 1.1
     for (const m of G.minis) {
       const o = G.minis[m.slot === 0 ? 1 : 0]
-      const ghost = m.hangOn >= 0 || o.hangOn === m.slot || G.time < m.ghostT || G.time < o.ghostT
-      if (m.body && ghostState.get(m) !== ghost && m.body.numColliders() > 0) {
+      const ghost = stacked || m.hangOn >= 0 || o.hangOn === m.slot || G.time < m.ghostT || G.time < o.ghostT
+      if (m.body && !m.hidden && ghostState.get(m) !== ghost && m.body.numColliders() > 0) {
         ghostState.set(m, ghost)
         m.body.collider(0).setSolverGroups(ghost ? GHOST_GROUPS : ROBOT_GROUPS)
       }
@@ -204,17 +204,18 @@ export function Simulation() {
       const rp = pilots[peerSlot()]
       fillLocalPilot(lp, localIn)
       if (s.mode === 'solo') {
-        rp.move.copy(lp.move); rp.aim.copy(lp.aim); rp.brake = false; rp.couple = lp.couple; rp.grab = lp.grab; rp.reel = lp.reel
+        rp.move.copy(lp.move); rp.aim.copy(lp.aim); rp.grab = lp.grab; rp.reel = lp.reel
         aiDriver.pilot?.(rp, lp, dt)
       } else {
-        rp.move.copy(remotePilot.move); rp.aim.copy(remotePilot.aim); rp.brake = remotePilot.brake; rp.couple = remotePilot.couple
+        rp.move.copy(remotePilot.move); rp.aim.copy(remotePilot.aim)
         rp.grab = remotePilot.grab; rp.reel = remotePilot.reel
         rp.jumps.push(...remotePilot.jumps); remotePilot.jumps.length = 0
         rp.xs.push(...remotePilot.xs); remotePilot.xs.length = 0
         rp.xr.push(...remotePilot.xr); remotePilot.xr.length = 0
+        rp.ps.push(...remotePilot.ps); remotePilot.ps.length = 0
       }
       if (G.big.active) stepBig(world, G.big, pilots, dt)
-      else { for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0; p.xr.length = 0 } }
+      else { for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0; p.xr.length = 0; p.ps.length = 0 } }
       hostForm(world, dt)
       hostCarry()
       for (const fn of G.hostLogic) fn(dt)
@@ -227,8 +228,9 @@ export function Simulation() {
       if (G.form === 'joined') {
         // Instant local feedback; the host resolves the joint window fairly.
         if (localIn.pressed.jump) { s.send('pj', { t: G.time }); G.big.ready[localSlot()] = 1; sfx(localSlot() === 0 ? 'beepCyan' : 'beepAmber', G.big.pos, 0.6) }
-        if (localIn.pressed.primary) s.send('px', { t: G.time })
-        if (localIn.released.primary) s.send('pxr', { t: G.time })
+        if (localIn.pressed.context) s.send('px', { t: G.time })
+        if (localIn.released.context) s.send('pxr', { t: G.time })
+        if (localIn.pressed.punch) s.send('pp', { t: G.time })
       }
     }
     if (import.meta.env.DEV) (window as any).__onStep?.()
@@ -256,7 +258,7 @@ export function Simulation() {
       const mv = camRelative(human.frame.move, G.cam.yaw, tmp2)
       const aim = pilotAim(tmp)
       const f = human.frame.held
-      const msg = { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], b: f.brake ? 1 : 0, c: f.couple ? 1 : 0, g: f.grab ? 1 : 0, r: f.primary ? 1 : 0 }
+      const msg = { m: [r2(mv.x), r2(mv.z)], a: [r2(aim.x), r2(aim.y), r2(aim.z)], g: f.grab ? 1 : 0, r: f.context ? 1 : 0 }
       const key = JSON.stringify(msg)
       if (key !== lastIntent || acc.intent >= 1 / NET.poseHz) {
         acc.intent = 0
@@ -277,9 +279,6 @@ let lastIntent = ''
 
 let mergeStarts: [number, number] = [-9, -9]
 
-function onPlate(m: Mini, p: Plate) {
-  return !m.hidden && !m.dead && Math.hypot(m.pos.x - p.pos.x, m.pos.z - p.pos.z) < p.radius && Math.abs(m.pos.y - MINI.feet - p.pos.y) < 1.2
-}
 
 function hostForm(world: World, dt: number) {
   const now = G.time
@@ -295,7 +294,7 @@ function hostForm(world: World, dt: number) {
       if (hb && mergeStarts[1] < 0) mergeStarts[1] = now
       if (!hb) mergeStarts[1] = -9
       if (ha !== hb) waiting = ha ? 0 : 1
-      // Consent: both hold Y for 0.6 s at the same time. A lone request just waits.
+      // Consent: both hold Acción for 0.6 s at the same time. A lone request just waits.
       if (ha && hb && a.coupleHold >= BIG.coupleHold && b.coupleHold >= BIG.coupleHold) {
         startMerge(p)
         waiting = -1
@@ -464,7 +463,7 @@ export function resetSimulationState() {
   aiDriver.pilot = null
   formRules.canSplit = () => true
   mergeStarts = [-9, -9]
-  for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0 }
+  for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0; p.xr.length = 0; p.ps.length = 0 }
   aimOff.yaw = 0
   aimOff.pitch = 0.35
 }

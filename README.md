@@ -13,16 +13,16 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
 
 ## Qué incluye
 
-- **Tutorial para un jugador, «Taller de pruebas».** Enseña cada verbo de uno en uno: moverse, salto variable, cajas, puño cableado, balanceo y muelle. Después aparece **Ámbar-bot**, un compañero IA hecho con Yuka, y con él se aprenden el trampolín, la mano ofrecida, el rescate en el aire, el acoplamiento, el salto unilateral frente al conjunto, el tirachinas y la separación.
+- **Tutorial para un jugador, «Taller de pruebas».** Enseña cada verbo de uno en uno: moverse, salto variable, cajas, pegar (un botón que abre una reja), gancho, balanceo y muelle. Después aparece **Ámbar-bot**, un compañero IA hecho con Yuka. Lo despiertas de un golpe y con él se aprenden el trampolín (saltar sobre su cabeza), la mano ofrecida, el rescate en el aire, el acoplamiento, el salto unilateral frente al conjunto, el tirachinas y la separación.
 - **Nivel 1 cooperativo online, «Muelles de rebote».** Tiene las seis salas del GDD:
-  1. **Escuela de guantes** (separados): un muro de 2,4 m que se supera con trampolín y mano ofrecida, y un hueco con un anillo alto que solo se alcanza desde el trampolín del compañero. El primero que cruza ofrece la mano al segundo.
-  2. **Cintas cruzadas** (separados): dos cintas a contracorriente y una caja con el nombre de cada uno. El tope de una cinta abre la barrera de la otra (relevo) y hay una única «carga rápida» que te ayuda a ti y acelera la cinta del compañero durante 5 s.
-  3. **Carrera de muelles** (opcional): arena de un minuto con doble consentimiento, dos rondas de 20 s, campanas propias, empujones con el puño, empate permitido y una pegatina de sesión para quien gane.
+  1. **Escuela de guantes** (separados): un muro de 2,4 m que se supera rebotando en la cabeza del compañero y ofreciéndole después la mano, y un hueco con un anillo alto que solo se alcanza desde el trampolín del compañero. El primero que cruza ofrece la mano al segundo.
+  2. **Cintas cruzadas** (separados): dos cintas a contracorriente y una caja con el nombre de cada uno. El tope de una cinta abre la barrera de la otra (relevo) y hay una única «carga rápida» (un botón que se activa a golpes) que te ayuda a ti y acelera la cinta del compañero durante 5 s.
+  3. **Carrera de muelles** (opcional): arena de un minuto con doble consentimiento, dos rondas de 20 s, campanas propias que se tocan a puñetazos, empujones, empate permitido y una pegatina de sesión para quien gane.
   4. **Primer cuerpo** (unidos): placa de acoplamiento con consentimiento doble de 0,6 s. La dirección del cuerpo es la media de las dos piernas. Primero un bote unilateral y después saltos conjuntos (ventana de 250 ms).
-  5. **Pasamanos de grúas** (unidos): un balancín físico, anillos alternos con brazos telescópicos de 8 m y un tirachinas de 6 m: se tensa manteniendo el gancho y se dispara soltando los dos dentro de 350 ms.
+  5. **Pasamanos de grúas** (unidos): un balancín físico, anillos alternos con brazos telescópicos de 8 m y un tirachinas de 6 m: se tensa manteniendo *Acción* y se dispara soltando los dos dentro de 350 ms.
   6. **Cangrejo clasificador** (clímax con las dos formas):
-     - **A:** cada mini engancha un pestillo y lo arrastra a la cinta, esquivando barridos avisados con 1 s de antelación.
-     - **B:** unidos, agarran las asas; uno ancla mientras el otro tira, y luego intercambian los papeles para extraer el fusible.
+     - **A:** cada mini engancha un pestillo y lo arrastra a la cinta, esquivando barridos avisados con 1 s de antelación. Un puñetazo en el visor mientras levanta una pinza le hace perder el ritmo y cancela el barrido.
+     - **B:** unidos, agarran las asas; uno ancla (deja su stick quieto) mientras el otro tira, y luego intercambian los papeles para extraer el fusible.
      - **C:** esquivan el barrido bajo con un salto conjunto y llevan el fusible a la toma.
 - **Obstáculos móviles con física** en el nivel 1, todos con aviso legible y sin muerte instantánea (empujan y aturden):
   - **Barredoras:** brazos acolchados que giran sobre un eje con baliza. Un anillo de peligro en el suelo marca el área barrida; hay que saltar el brazo a tiempo. Hay una de calentamiento en la Escuela de guantes y otra de dos brazos en el patio tras las cintas.
@@ -52,15 +52,16 @@ npm run dev          # cliente Vite (http://localhost:5173) + servidor Colyseus 
 
 ### Controles
 
+Cuatro botones de acción, colocados como en el mando de GameCube: **Saltar** grande en el centro y los otros tres rodeándolo por arriba y a la izquierda. Todo lo que un botón puede hacer **se ilumina en su color**: violeta para *Acción*, azul para *Agarrar* y rojo para *Pegar*.
+
 | Mando | Teclado / ratón | Mini robot | Cuerpo unido |
 |---|---|---|---|
 | Stick izq. | WASD | Moverse | Dirigir **tu** pierna |
 | Stick der. | Ratón | Cámara | Apuntar **tu** brazo |
-| A | Espacio | Saltar (mantén = más alto) | Impulso de tu pierna (dos a la vez = salto conjunto) |
-| B | Shift | Agacharse · hacer de trampolín | Anclar tu pierna (pivote) |
-| **RT** (o X) | **Clic izq.** / F | **Gancho (4 m), un solo botón:** mantén para engancharte y recoger cable; al recogerlo del todo se carga el muelle. Suelta para soltarte (con carga, sales disparado). Un toque rápido da un tirón hacia el anillo. | **Brazo telescópico (8 m):** mantén para engancharte y tensar; suelta para soltar. Tirachinas: tensad al máximo y **soltad a la vez** |
-| LT | E / Clic der. / Q | Agarrar · ofrecer la mano · coger cajas | Agarrar asas con tu mano |
-| Y (mantener) | R | Acoplarse en una placa | Separarse |
+| **A** · Saltar (verde) | Espacio | Saltar (mantén = más alto). Al caer sobre la cabeza del compañero rebotas como en un trampolín | Impulso de tu pierna (dos a la vez = salto conjunto) |
+| **B** / LT · Agarrar (azul) | E / Shift | Mantén para **ofrecer la mano** y subir a tu compañero. Coge su mano en el aire, coge cajas. En el aire contra un muro, **te agarras a él** (salta para impulsarte). Junto a tu compañero, **lo agarras y lo arrastras** | Agarrar asas con tu mano |
+| **X** · Pegar (rojo) | Clic izq. / F | **Pegar**: empuja a tu compañero, golpea al cangrejo, toca campanas y activa botones. Con caja, la lanza | Golpe de brazo: campanas, botones, enemigos |
+| **Y** / RT · Acción (violeta) | Clic der. / Q / R | **Contextual**: con un anillo iluminado, mantén para engancharte y recoger (cargado = muelle; un toque = tirón). En una placa, mantén para acoplaros | Con un anillo iluminado: lanzar tu brazo y tensar (tirachinas = soltad a la vez). Sin anillo: mantén para separaros |
 | RB | G | Señalar un punto | Señalar |
 | Cruceta | 1-4 | Gestos | Gestos |
 | — | V / M | Pulsar para hablar / silenciar | |
@@ -71,8 +72,8 @@ Se juega en horizontal. Al primer toque el juego pasa a pantalla completa y bloq
 
 - **Pulgar izquierdo:** stick flotante. Aparece donde apoyas el dedo y se arrastra contigo si te pasas del borde, así que nunca hay que volver al centro.
 - **Pulgar derecho:** arrastra en cualquier zona libre para mover la cámara. Unidos, ese arrastre apunta tu brazo.
-- **Botones en arco alrededor de *Saltar*:** Gancho (🪝, mantener) y Agarrar en el primer anillo; Agachar y Unir, más pequeños, en el segundo. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
-- Los botones que pide el juego parpadean. Los textos de objetivo cambian «RT», «X»… por los iconos de pantalla.
+- **Botones al estilo GameCube:** *Saltar* grande en la esquina y, alrededor, tres botones redondos: *Pegar* a la izquierda (donde iría la B), *Agarrar* arriba a la izquierda y *Acción* arriba. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
+- Los botones que pide el juego parpadean, y los textos de objetivo muestran los iconos de pantalla.
 - Hay vibración háptica. En *Ajustes → Pantalla táctil* se cambian la sensibilidad, el tamaño de los botones y la vibración.
 - Arriba a la derecha están el micro (online), la señal, los gestos y la pausa.
 
@@ -168,6 +169,7 @@ Además, durante el desarrollo se jugó la partida en Chromium sin interfaz con 
 - El rescate con la mano entre clientes y el transporte de cajas por el invitado.
 - El acoplamiento online, la pierna única, las dos piernas y el salto conjunto.
 - Todas las mecánicas del tutorial y del cangrejo (fases A, B y C) hasta la pantalla final.
+- Con los cuatro botones: el tutorial completo de principio a fin y el nivel 1 sala a sala hasta la pantalla final. Online se verificaron el rebote en la cabeza, arrastrar al compañero, los empujones, el acoplamiento y la separación con *Acción*.
 
 ## Créditos
 

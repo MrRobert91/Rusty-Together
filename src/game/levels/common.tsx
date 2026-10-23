@@ -23,7 +23,7 @@ export const say = {
   mood: (m: MusicMood) => hostSet('mood', m),
   room: (n: string, title: string, mode: string) => fx('room', { n, title, mode }),
   banner: (title: string, sub?: string, color?: string) => fx('banner', { title, sub, color }),
-  toast: (text: string, tone: 'info' | 'good' | 'warn' | 'cyan' | 'amber' = 'info') => fx('toast', { text, tone }),
+  toast: (text: string, tone: 'info' | 'good' | 'warn' | 'cyan' | 'amber' = 'info', ms?: number) => fx('toast', { text, tone, ms }),
   sub: (who: string, text: string, color = '#ffd27a') => fx('subtitle', { who, text, color }),
 }
 
@@ -37,7 +37,7 @@ export function PresentationBridge() {
     const subs = [
       onFx('room', (e) => roomTitle(e.n, e.title, e.mode)),
       onFx('banner', (e) => banner(e.title, e.sub, e.color)),
-      onFx('toast', (e) => toast(e.text, e.tone)),
+      onFx('toast', (e) => toast(e.text, e.tone, e.ms)),
       onFx('subtitle', (e) => subtitle(e.who, e.text, e.color)),
       onFx('medal', (e) => toast(`Medalla: ${MEDALS[e.id] ?? e.id}`, 'good', 3500)),
     ]

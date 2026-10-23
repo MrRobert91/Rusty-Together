@@ -1,9 +1,9 @@
 import { Vector3 } from 'three'
 import type { World } from '@dimforge/rapier3d-compat'
-import { G, act, ballistic, clamp, dampAngle, fx, type Anchor, type Mini } from '../runtime'
+import { G, act, ballistic, clamp, dampAngle, fx, plateUnder, type Anchor, type Mini } from '../runtime'
 import { GRAVITY, MINI } from '../tuning'
 import type { StepInput } from '../control'
-import { lineOfSight, newGroundHit, probeGround, raycastPoint } from './physicsUtil'
+import { lineOfSight, newGroundHit, probeGround, raycastPoint, wallProbe } from './physicsUtil'
 import { settings } from '../../core/settings'
 import { rumble } from '../../core/input'
 
@@ -22,11 +22,14 @@ interface Local {
   prevVy: number
   grabHeldSince: number
   stepPhase: number
+  /** Wall grip already used this airtime (and the wall it was on). */
+  clingUsed: boolean
+  clingLastN: Vector3
 }
 const locals = new WeakMap<Mini, Local>()
 const L = (m: Mini): Local => {
   let l = locals.get(m)
-  if (!l) locals.set(m, (l = { noCatchUntil: 0, lastGround: 0, jumpBuf: -9, netT: -9, netTo: null, prevVy: 0, grabHeldSince: -9, stepPhase: 0 }))
+  if (!l) locals.set(m, (l = { noCatchUntil: 0, lastGround: 0, jumpBuf: -9, netT: -9, netTo: null, prevVy: 0, grabHeldSince: -9, stepPhase: 0, clingUsed: false, clingLastN: new Vector3() }))
   return l
 }
 
@@ -86,6 +89,8 @@ function releaseAll(m: Mini) {
   m.cable.charge = 0
   m.hangOn = -1
   m.offering = false
+  m.towing = false
+  m.cling = false
 }
 
 export function respawnMini(m: Mini, at: Vector3, yaw: number) {
@@ -100,6 +105,8 @@ export function respawnMini(m: Mini, at: Vector3, yaw: number) {
   m.cable.state = 'idle'
   m.cable.anchorId = null
   m.carrying = null
+  m.towing = false
+  m.cling = false
   if (m.body) {
     m.body.setTranslation({ x: at.x, y: at.y, z: at.z }, true)
     m.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -115,7 +122,7 @@ export interface TargetPick { kind: 'anchor' | 'robot' | 'none'; anchor: Anchor 
 
 const pick: TargetPick = { kind: 'none', anchor: null, point: new Vector3() }
 
-/** Best thing the cable fist can reach along the aim direction. */
+/** Best thing the contextual hook can reach along the aim direction. */
 export function pickMiniTarget(world: World, m: Mini, aim: Vector3, partner: Mini): TargetPick {
   pick.kind = 'none'
   pick.anchor = null
@@ -123,9 +130,8 @@ export function pickMiniTarget(world: World, m: Mini, aim: Vector3, partner: Min
   handPos(m, tmp2)
   const range = MINI.cableRange + (settings().assist ? 0.6 : 0)
   for (const a of G.anchors.values()) {
-    if (!a.enabled || !a.mini) continue
+    if (!a.enabled || !a.mini || !HOOKABLE.has(a.kind)) continue
     if (a.kind === 'glove' && a.id === `glove:${m.slot}`) continue
-    if (a.owner !== undefined && a.kind !== 'bell') continue
     tmp.copy(a.pos).sub(tmp2)
     const d = tmp.length()
     if (d > range || d < 0.4) continue
@@ -134,17 +140,46 @@ export function pickMiniTarget(world: World, m: Mini, aim: Vector3, partner: Min
     // Generous cone, extra generous for things above us (rings).
     const cone = a.pos.y > m.pos.y + 0.5 ? 0.15 : 0.45
     if (dot < cone) continue
-    const score = d * 0.6 + (1 - dot) * 6 - (a.kind === 'glove' ? 1.5 : 0) - (a.kind === 'bell' && a.owner === m.slot ? 1 : 0)
+    const score = d * 0.6 + (1 - dot) * 6 - (a.kind === 'glove' ? 1.5 : 0)
     if (score < best && lineOfSight(world, tmp2, a.pos, m.body)) { best = score; pick.kind = 'anchor'; pick.anchor = a; pick.point.copy(a.pos) }
   }
-  // Partner robot (playful punch) if nothing better.
-  if (pick.kind === 'none' && !partner.hidden && !partner.dead) {
-    tmp.copy(partner.pos).sub(tmp2)
+  void partner
+  return pick
+}
+
+/** What the contextual button hooks (rings, crab latches, the partner's offered hand). */
+const HOOKABLE = new Set(['ring', 'latch', 'glove'])
+/** What a punch can hit besides the partner. */
+const PUNCHABLE = new Set(['bell', 'button', 'enemy'])
+
+/**
+ * Punch target: the nearest bell / button / enemy within reach, else the
+ * partner. Generous on direction (the robot turns to face it), strict on reach.
+ */
+export function pickPunchTarget(world: World, m: Mini, partner: Mini): TargetPick {
+  pick.kind = 'none'
+  pick.anchor = null
+  let best = Infinity
+  facing(m, fwd)
+  tmp2.copy(m.pos).addScaledVector(UP, 0.15)
+  const reach = MINI.punchRange + (settings().assist ? 0.4 : 0)
+  for (const a of G.anchors.values()) {
+    if (!a.enabled || !a.mini || !PUNCHABLE.has(a.kind)) continue
+    tmp.copy(a.pos).sub(tmp2)
     const d = tmp.length()
-    if (d < range && d > 0.3) {
-      tmp.divideScalar(d)
-      if (tmp.dot(aim) > 0.7) { pick.kind = 'robot'; pick.point.copy(partner.pos) }
-    }
+    if (d > reach) continue
+    const flat = Math.hypot(tmp.x, tmp.z)
+    const dot = flat > 0.05 ? (tmp.x * fwd.x + tmp.z * fwd.z) / flat : 1
+    if (dot < -0.3) continue
+    const score = d + (1 - dot) * 0.8 - (a.owner === m.slot ? 0.5 : 0)
+    if (score < best && lineOfSight(world, tmp2, a.pos, m.body)) { best = score; pick.kind = 'anchor'; pick.anchor = a; pick.point.copy(a.pos) }
+  }
+  if (!partner.hidden && !partner.dead && partner.hangOn !== m.slot && m.hangOn < 0) {
+    tmp.copy(partner.pos).sub(m.pos)
+    const d = tmp.length()
+    const flat = Math.hypot(tmp.x, tmp.z)
+    const dot = flat > 0.05 ? (tmp.x * fwd.x + tmp.z * fwd.z) / flat : 1
+    if (d < MINI.punchPartnerRange && dot > -0.2 && d + (1 - dot) * 0.8 < best) { pick.kind = 'robot'; pick.anchor = null; pick.point.copy(partner.pos) }
   }
   return pick
 }
@@ -203,6 +238,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
     }
   }
 
+  if (m.grounded) { l.clingUsed = false; m.cling = false }
   if (!wasGrounded && m.grounded) {
     const impact = clamp(-l.prevVy / 16, 0.15, 1)
     m.landT = t
@@ -227,8 +263,8 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
       fx('sfx', { n: 'spring', p: m.pos })
       fx('particles', { n: 'stars', p: { x: m.pos.x, y: m.pos.y - 0.4, z: m.pos.z } })
     }
-    // Springboard: landing on a crouched partner's head.
-    if (gh.ud.robot === partner.slot + 1 && partner.crouch) {
+    // Springboard: landing on the partner's head always bounces you up.
+    if (gh.ud.robot === partner.slot + 1 && !partner.hidden && l.prevVy < -0.5 && !m.towing && partner.hangOn < 0) {
       v.y = MINI.boostVel
       m.grounded = false
       m.jumpT = t
@@ -264,8 +300,6 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   for (const [i, k] of (['emote1', 'emote2', 'emote3', 'emote4'] as const).entries()) {
     if (inp.pressed[k]) { m.emote = i + 1; m.emoteT = t; fx('sfx', { n: 'emote', p: m.pos }) }
   }
-
-  m.crouch = !!inp.held.brake && m.grounded && !m.carrying && m.hangOn < 0
 
   /* ---- hanging from the partner's hand ---- */
   if (m.hangOn >= 0) {
@@ -311,10 +345,73 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
     }
   }
 
+  /* ---- being dragged by the partner ---- */
+  const dragged = partner.towing && !partner.hidden && !partner.dead && m.hangOn < 0
+
+  /* ---- wall grip ---- */
+  const catchable = partner.offering && !partner.hidden && t > l.noCatchUntil && tmp.copy(m.pos).addScaledVector(UP, 0.5).distanceTo(partner.glove) < MINI.gloveRange + 0.4
+  if (m.cling) {
+    const stillThere = wallProbe(world, m.pos, tmp2.copy(m.clingN).negate(), MINI.clingReach + 0.15, b, tmp)
+    m.clingT += dt
+    if (inp.pressed.jump) {
+      // Wall jump: up and away. One per wall; the next one needs another wall.
+      m.cling = false
+      l.clingUsed = true
+      l.clingLastN.copy(m.clingN)
+      v.copy(m.clingN).multiplyScalar(MINI.wallJumpOut)
+      v.y = jumpVel * MINI.wallJumpUp
+      m.yaw = Math.atan2(m.clingN.x, m.clingN.z)
+      m.jumpT = t
+      m.launchedT = 0.22
+      l.jumpBuf = -9
+      fx('sfx', { n: 'jump', p: m.pos })
+      fx('particles', { n: 'step', p: m.pos }, false)
+      finish(m, v, dt, move)
+      return
+    }
+    if (!grabHeld || !stillThere || m.clingT > MINI.clingTime || inp.pressed.context || catchable) {
+      m.cling = false
+      l.clingUsed = true
+      l.clingLastN.copy(m.clingN)
+      if (m.clingT > MINI.clingTime) fx('sfx', { n: 'release', p: m.pos })
+    } else {
+      // Stuck to the wall: slow slide, facing it.
+      v.copy(m.clingN).multiplyScalar(-0.6)
+      v.y = -MINI.clingSlide * Math.min(1, m.clingT / MINI.clingTime + 0.3)
+      m.yaw = dampAngle(m.yaw, Math.atan2(-m.clingN.x, -m.clingN.z), 14, dt)
+      m.vel.copy(v)
+      b.setLinvel({ x: v.x, y: v.y, z: v.z }, true)
+      return
+    }
+  } else if (grabHeld && !m.grounded && !m.carrying && m.cable.state === 'idle' && !catchable && v.y < 4 && t - m.jumpT > 0.12) {
+    // Grab pressed (or held) against a wall in the air: stick to it.
+    facing(m, fwd)
+    const dirs = [fwd, tmp2.set(move.x, 0, move.z)]
+    for (const d of dirs) {
+      if (d.lengthSq() < 0.05) continue
+      d.normalize()
+      const hit = wallProbe(world, m.pos, d, MINI.clingReach, b, tmp)
+      if (!hit) continue
+      if (l.clingUsed && hit.dot(l.clingLastN) > 0.5) continue
+      m.cling = true
+      m.clingT = 0
+      m.clingN.copy(hit)
+      m.offering = false
+      fx('sfx', { n: 'grab', p: m.pos, v: 0.8 })
+      fx('particles', { n: 'spark', p: tmp })
+      if (m.kind === 'local') rumble(0.25, 0.2, 50)
+      v.set(0, 0, 0)
+      m.vel.copy(v)
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      return
+    }
+  }
+
   /* ---- offering a hand ---- */
-  const canOffer = m.grounded && !m.carrying && m.cable.state === 'idle'
+  const canOffer = m.grounded && !m.carrying && m.cable.state === 'idle' && !m.towing && !dragged
   const wasOffering = m.offering
-  m.offering = !!grabHeld && canOffer && !nearGrabbable(m, partner)
+  // Once offered, keep offering while held (the partner hanging nearby must not cancel it).
+  m.offering = !!grabHeld && canOffer && (wasOffering || !nearGrabbable(m, partner))
   if (m.offering && !wasOffering) fx('sfx', { n: 'grab', p: m.pos, v: 0.5 })
   if (partner.hangOn === m.slot && m.offering) {
     m.hangT += dt
@@ -330,7 +427,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   }
 
   /* ---- grab: partner glove, boxes, drop ---- */
-  // Holding RT in the air means "ready to catch": grab the hand as soon as it's in reach.
+  // Holding grab in the air means "ready to catch": take the hand as soon as it's in reach.
   if (!inp.pressed.grab && inp.held.grab && !m.grounded && !m.carrying && m.hangOn < 0 && partner.offering && !partner.hidden && t > l.noCatchUntil) {
     const range = settings().assist ? MINI.assistGloveRange : MINI.gloveRange
     tmp.copy(m.pos).addScaledVector(UP, 0.5)
@@ -368,14 +465,25 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
           m.offering = false
           act('grab', { id: box })
           fx('sfx', { n: 'grab', p: m.pos })
+        } else if (canTow(m, partner)) {
+          // Grab the partner's body: they come with you while you hold.
+          m.towing = true
+          m.offering = false
+          fx('sfx', { n: 'grab', p: partner.pos })
+          fx('particles', { n: 'burst', p: partner.pos, c: '#9cc8ff', s: 0.4 })
+          if (m.kind === 'local') rumble(0.3, 0.2, 60)
         }
       }
     }
   }
+  if (m.towing && (!grabHeld || partner.hidden || partner.dead || m.carrying || m.hangOn >= 0 || partner.hangOn >= 0 || m.pos.distanceTo(partner.pos) > MINI.towBreak)) {
+    m.towing = false
+    fx('sfx', { n: 'release', p: m.pos })
+  }
 
 
   /* ---- horizontal ---- */
-  let maxS = m.carrying ? MINI.carrySpeed : m.crouch ? MINI.crouchSpeed : MINI.speed
+  let maxS = m.carrying ? MINI.carrySpeed : m.towing ? MINI.towSpeed : MINI.speed
   if (m.offering) maxS = partner.hangOn === m.slot ? 0 : 1.6
   target.copy(move).multiplyScalar(maxS)
   rel.set(v.x - gv.x, 0, v.z - gv.z)
@@ -400,6 +508,22 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   }
   v.x = rel.x + gv.x
   v.z = rel.z + gv.z
+
+  // Dragged: a soft leash toward the partner holding us (our stick only struggles).
+  if (dragged) {
+    tmp.set(partner.pos.x - m.pos.x, 0, partner.pos.z - m.pos.z)
+    const d = tmp.length()
+    if (d > MINI.towRest) {
+      tmp.divideScalar(d)
+      const pull = Math.min(12, (d - MINI.towRest) * 9)
+      const tx = partner.vel.x * 0.9 + tmp.x * pull + move.x * 1.2
+      const tz = partner.vel.z * 0.9 + tmp.z * pull + move.z * 1.2
+      const k = Math.min(1, 14 * dt)
+      v.x += (tx - v.x) * k
+      v.z += (tz - v.z) * k
+      if (m.grounded && Math.abs(partner.vel.x) + Math.abs(partner.vel.z) > 0.5) m.yaw = dampAngle(m.yaw, Math.atan2(tmp.x, tmp.z), 6, dt)
+    }
+  }
 
   /* ---- vertical ---- */
   if (inp.pressed.jump) l.jumpBuf = t
@@ -430,19 +554,23 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
     v.y = Math.max(v.y, -32)
   }
 
-  /* ---- cable fist ---- */
-  stepCable(world, m, inp, dt, partner)
+  /* ---- contextual: couple on a plate, otherwise the hook ---- */
+  const plate = m.grounded && G.form === 'split' ? plateUnder(m) : null
+  m.coupleHold = plate && inp.held.context && m.cable.state === 'idle' ? m.coupleHold + dt : 0
+  stepCable(world, m, inp, dt, partner, !plate)
 
-  /* ---- carried box: throw with X ---- */
-  if (m.carrying && inp.pressed.primary) {
-    facing(m, fwd)
-    act('drop', { id: m.carrying, v: [v.x + fwd.x * 7.5, 4.5, v.z + fwd.z * 7.5] })
-    m.carrying = null
-    fx('sfx', { n: 'whoosh', p: m.pos })
+  /* ---- punch (or throw the carried box) ---- */
+  if (inp.pressed.punch && t - m.punchT > MINI.punchCooldown && m.hangOn < 0) {
+    if (m.carrying) {
+      facing(m, fwd)
+      act('drop', { id: m.carrying, v: [v.x + fwd.x * 7.5, 4.5, v.z + fwd.z * 7.5] })
+      m.carrying = null
+      m.punchT = t
+      fx('sfx', { n: 'whoosh', p: m.pos })
+    } else if (m.cable.state === 'idle') {
+      punch(world, m, partner)
+    }
   }
-
-  // Couple consent (held Y while standing).
-  m.coupleHold = inp.held.couple && m.grounded ? m.coupleHold + dt : 0
 
   if (inp.pressed.signal && m.kind === 'local') {
     fwd.copy(G.cam.fwd)
@@ -476,33 +604,27 @@ function finish(m: Mini, vel: Vector3, dt: number, move: Vector3) {
  * with charge fires the spring; releasing mid-swing keeps the arc's momentum.
  * A quick tap that lands after the button is up becomes a short yank.
  */
-function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: Mini) {
+function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: Mini, canFire = true) {
   const c = m.cable
   const t = G.time
-  const hold = !!inp.held.primary || !!inp.pressed.primary
+  const hold = !!inp.held.context || !!inp.pressed.context
   handPos(m, tmp2)
 
-  if (inp.pressed.primary && !m.carrying && m.hangOn < 0 && c.state === 'idle') {
-    const aim = inp.aim
-    const pk = pickMiniTarget(world, m, aim, partner)
-    c.tip.copy(tmp2)
-    c.state = 'flying'
-    c.t = t
-    c.charge = 0
+  if (canFire && inp.pressed.context && !m.carrying && m.hangOn < 0 && c.state === 'idle') {
+    // Contextual: only fires at something that glows (a hook target in reach).
+    const pk = pickMiniTarget(world, m, inp.aim, partner)
     if (pk.kind === 'anchor') {
+      c.tip.copy(tmp2)
+      c.state = 'flying'
+      c.t = t
+      c.charge = 0
+      c.punch = false
       c.anchorId = pk.anchor!.id
       c.target.copy(pk.anchor!.pos)
       c.hit = true
-    } else if (pk.kind === 'robot') {
-      c.anchorId = `robot:${partner.slot}`
-      c.target.copy(partner.pos)
-      c.hit = true
-    } else {
-      c.anchorId = null
-      c.target.copy(tmp2).addScaledVector(aim, MINI.cableRange)
-      c.hit = false
+      m.cling = false
+      fx('sfx', { n: 'cableFire', p: m.pos })
     }
-    fx('sfx', { n: 'cableFire', p: m.pos })
   }
 
   if (c.state === 'flying') {
@@ -520,17 +642,20 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
         // Playful punch. Strong inside the arena, gentle elsewhere.
         tmp.copy(partner.pos).sub(m.pos).setY(0).normalize()
         const strong = !!G.vars.arenaLive
-        punchPartner(partner, tmp, strong ? 7.5 : 3)
+        punchPartner(partner, tmp, strong ? 7.5 : 3.5)
         fx('sfx', { n: 'bonk', p: partner.pos })
         fx('particles', { n: 'stars', p: partner.pos })
+        if (m.kind === 'local') rumble(0.4, 0.3, 70)
         c.state = 'retract'
         return
       }
       if (!a || !a.enabled) { c.state = 'retract'; return }
-      fx('sfx', { n: 'cableHit', p: a.pos })
-      fx('particles', { n: 'spark', p: a.pos })
-      if (a.kind === 'bell') {
-        act('bell', { id: a.id })
+      fx('sfx', { n: c.punch ? 'bonk' : 'cableHit', p: a.pos })
+      fx('particles', { n: c.punch ? 'stars' : 'spark', p: a.pos })
+      if (c.punch) {
+        if (a.kind === 'bell') act('bell', { id: a.id })
+        else act('punch', { id: a.id })
+        if (m.kind === 'local') rumble(0.4, 0.3, 70)
         c.state = 'retract'
         return
       }
@@ -563,7 +688,7 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
     tmp.copy(tmp2).sub(c.tip)
     const d = tmp.length()
     const step = MINI.cableSpeed * 1.2 * dt
-    if (d <= step) { c.state = 'idle'; c.anchorId = null; c.charge = 0; c.reeling = false }
+    if (d <= step) { c.state = 'idle'; c.anchorId = null; c.charge = 0; c.reeling = false; c.punch = false }
     else c.tip.addScaledVector(tmp, step / d)
     return
   }
@@ -687,7 +812,7 @@ export function applyHit(m: Mini, msg: { d: number[]; f: number }) {
   if (m.kind === 'local') rumble(0.8, 0.5, 160)
 }
 
-function nearestBox(m: Mini): string | null {
+export function nearestBox(m: Mini): string | null {
   let best: string | null = null
   let bd = MINI.boxRange + (settings().assist ? 0.4 : 0)
   facing(m, fwd)
@@ -702,7 +827,40 @@ function nearestBox(m: Mini): string | null {
 }
 
 function nearGrabbable(m: Mini, partner: Mini) {
-  // Don't turn a box pickup / glove grab into a hand offer.
+  // Don't turn a box pickup / glove grab / partner grab into a hand offer.
   if (partner.offering && m.pos.distanceTo(partner.glove) < MINI.gloveRange + 0.3) return true
-  return !!nearestBox(m)
+  return !!nearestBox(m) || canTow(m, partner)
+}
+
+/** Fist jab at the best punch target (or a whiff straight ahead). */
+function punch(world: World, m: Mini, partner: Mini) {
+  const c = m.cable
+  const pk = pickPunchTarget(world, m, partner)
+  handPos(m, tmp2)
+  m.punchT = G.time
+  c.state = 'flying'
+  c.punch = true
+  c.t = G.time
+  c.charge = 0
+  c.tip.copy(tmp2)
+  if (pk.kind === 'none') {
+    facing(m, fwd)
+    c.anchorId = null
+    c.hit = false
+    c.target.copy(tmp2).addScaledVector(fwd, 1.5)
+  } else {
+    // Turn to face what we punch: the robot always aims for the player.
+    m.yaw = Math.atan2(pk.point.x - m.pos.x, pk.point.z - m.pos.z)
+    c.hit = true
+    c.anchorId = pk.kind === 'robot' ? `robot:${partner.slot}` : pk.anchor!.id
+    c.target.copy(pk.point)
+  }
+  fx('sfx', { n: 'whoosh', p: m.pos, v: 0.7 })
+}
+
+/** Partner close enough, on about the same level, and free to be grabbed. */
+export function canTow(m: Mini, partner: Mini) {
+  if (partner.hidden || partner.dead || partner.hangOn >= 0 || partner.towing || !m.grounded) return false
+  tmp.copy(partner.pos).sub(m.pos)
+  return Math.abs(tmp.y) < 0.7 && Math.hypot(tmp.x, tmp.z) < MINI.towReach
 }

@@ -7,7 +7,6 @@ export const MINI = {
   feet: 0.5, // centre → feet
   speed: 5,
   carrySpeed: 4,
-  crouchSpeed: 1.8,
   accelGround: 55,
   decelGround: 70,
   accelAir: 24,
@@ -18,7 +17,7 @@ export const MINI = {
   apexHang: 0.55,
   coyote: 0.12,
   buffer: 0.12,
-  boostVel: 14.5, // springing off a crouched partner
+  boostVel: 14.5, // landing on the partner's head bounces you up (springboard)
   cableRange: 4.25,
   cableSpeed: 46,
   reelSpeed: 5,
@@ -34,6 +33,18 @@ export const MINI = {
   hoistDelay: 0.25,
   hoistTime: 0.55,
   knockProtect: 1.5,
+  punchRange: 2.4, // fist jab reach for bells, buttons and enemies
+  punchPartnerRange: 1.9,
+  punchCooldown: 0.35,
+  clingTime: 1.8, // wall grip before you slide off
+  clingSlide: 0.35, // m/s slide while gripping
+  clingReach: 0.62, // centre → wall distance that counts as touching
+  wallJumpUp: 0.85, // × jump velocity
+  wallJumpOut: 4.2,
+  towReach: 1.5, // grab your partner's body within this distance
+  towRest: 1.15, // dragged partner trails at this distance
+  towBreak: 3.6,
+  towSpeed: 3.6, // walking speed while dragging
   respawnDelay: 1.1,
 }
 
@@ -61,11 +72,20 @@ export const BIG = {
   coupleSpan: 2,
   mergeTime: 1.2,
   gripRange: 2.2,
+  punchRange: 3.6,
 }
 
 export const NET = {
   poseHz: 30,
   worldHz: 30,
+}
+
+/** Button colours: the world lights up in the colour of the button that acts on it. */
+export const BTN_COLOR = {
+  jump: '#3ec46d',
+  grab: '#4f9bff',
+  punch: '#ff5b4a',
+  context: '#c46bff',
 }
 
 export const COLORS = {
