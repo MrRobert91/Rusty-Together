@@ -17,6 +17,7 @@ const FPS = 30
   await page.addStyleTag({ content: `.objective, .prompts, .portraits, .toasts, .crosshair, .partner-arrow, .click-to-play, .subtitle, .fps, .pilots { display: none !important; } .pops { z-index: 40 }` })
   await page.evaluate(() => { const s = __G.fx.get('levelDone') ?? (__G.fx.set('levelDone', new Set()), __G.fx.get('levelDone')); s.add(() => { window.__levelDone = true }) })
   await page.evaluate(() => { window.__realRender = __gl.render.bind(__gl); window.__setRender = (on) => { __gl.render = on ? window.__realRender : () => {} } })
+  if (process.env.CLIPS) await page.evaluate((c) => { window.__clipFilter = c.split(',') }, process.env.CLIPS)
   await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, 'botlib.js'), 'utf8') })
   await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, planFile), 'utf8') })
   let seen = 0
@@ -27,6 +28,8 @@ const FPS = 30
     const st = await page.evaluate(() => ({ rec: __bot.rec, log: __bot.log, done: __bot.done, fail: __bot.fail, t: __G.time }))
     for (; seen < st.log.length; seen++) console.log(st.log[seen])
     if (st.done || st.fail) { console.log(st.fail ? 'FAIL ' + st.fail : 'DONE', Math.round((Date.now() - t0) / 1000) + ' s wall'); break }
+    // Safety: a runaway clip (a bot retrying) stops being rendered after MAXF frames.
+    if (st.rec && (counters[st.rec] ?? 0) >= +(process.env.MAXF || 330)) st.rec = null
     if (st.rec) {
       if (!rendering) { await page.evaluate(() => { __setRender(true); __vclock.advance(100, 1000 / 60) }); rendering = true }
       await page.evaluate((fps) => {

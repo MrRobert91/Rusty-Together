@@ -4,6 +4,7 @@
   const G = window.__G
   const B = window.__bot
   const P = window.__P
+  P.install()
   const me = () => B.me()
   const am = () => G.minis[1]
   const feet = (m) => m.pos.y - 0.5

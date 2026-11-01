@@ -75,6 +75,7 @@
       }
       if (s.enter && !s._entered) { s._entered = true; s.enter(bot) }
       // Trailer capture: steps tagged with `clip` are recorded (plus a tail).
+      if (s.clip && window.__clipFilter && !window.__clipFilter.includes(s.clip)) s._clipped = true
       if (s.clip && bot.rec !== s.clip && bot.stepT >= (s.clipAfter ?? 0) && !s._clipped) { s._clipped = true; bot.rec = s.clip; bot.recUntil = Infinity; bot.recStart = G.time; bot.note('● rec ' + s.clip) }
       if (s.clip && bot.rec === s.clip && s.clipMax && G.time - bot.recStart > s.clipMax) { bot.recUntil = G.time }
       if (bot.rec && bot.recUntil !== Infinity && G.time > bot.recUntil) { bot.note('■ stop ' + bot.rec); bot.rec = null }
@@ -134,7 +135,9 @@
     releaseAll() { P.held.clear() },
   })
   void THREE_V
-  window.__aiDriver.mini = (inp) => {
+  // Only plans that drive Ámbar themselves install this (the tutorial keeps Ámbar-bot's AI).
+  P.install = () => { window.__aiDriver.mini = miniDriver; window.__aiDriver.pilot = pilotDriver }
+  const miniDriver = (inp) => {
     const m = P.me()
     inp.move.set(P.mx, 0, P.mz)
     for (const b of Object.keys(inp.held)) {
@@ -148,7 +151,7 @@
     if (P.aim) inp.aim.copy(P.aim)
     else inp.aim.set(Math.sin(m.yaw), 0.3, Math.cos(m.yaw)).normalize()
   }
-  window.__aiDriver.pilot = (rp, lp) => {
+  const pilotDriver = (rp, lp) => {
     const now = G.time
     if (P.pilotMove) rp.move.copy(P.pilotMove)
     else if (!P.syncMove) rp.move.set(0, 0, 0)
