@@ -21,19 +21,19 @@ grep -v '^#' "$HERE/segments.txt" | while read -r clip start dur card zoom; do
   vf="scale=1280:720,zoompan=z='1+($z-1)*on/$frames':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1280x720:fps=30"
   if [ "$card" != "-" ]; then
     fo=$(awk "BEGIN { print $dur - 0.45 }")
-    ffmpeg -hide_banner -loglevel error -y -framerate 30 -start_number "$sframe" -i "$src" -loop 1 -framerate 30 -i "$CARDS/$card.png" \
+    ffmpeg -nostdin -hide_banner -loglevel error -y -framerate 30 -start_number "$sframe" -i "$src" -loop 1 -framerate 30 -i "$CARDS/$card.png" \
       -filter_complex "[0:v]$vf[v];[1:v]format=rgba,fade=t=in:st=0.15:d=0.3:alpha=1,fade=t=out:st=$fo:d=0.35:alpha=1[c];[v][c]overlay=shortest=1:format=auto" \
       -frames:v "$frames" -c:v libx264 -pix_fmt yuv420p -crf 16 -preset fast "$TMP/$n.mp4"
   else
-    ffmpeg -hide_banner -loglevel error -y -framerate 30 -start_number "$sframe" -i "$src" -vf "$vf" \
+    ffmpeg -nostdin -hide_banner -loglevel error -y -framerate 30 -start_number "$sframe" -i "$src" -vf "$vf" \
       -frames:v "$frames" -c:v libx264 -pix_fmt yuv420p -crf 16 -preset fast "$TMP/$n.mp4"
   fi
   echo "file '$TMP/$n.mp4'" >> "$TMP/list.txt"
   echo "segment $n: $clip @$start +$dur ($card)"
 done
-ffmpeg -hide_banner -loglevel error -y -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/video.mp4"
+ffmpeg -nostdin -hide_banner -loglevel error -y -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/video.mp4"
 # Music under everything; a short fade at both ends.
-ffmpeg -hide_banner -loglevel error -y -i "$TMP/video.mp4" -i "$MUSIC" -map 0:v -map 1:a -c:v libx264 -crf 21 -preset slow -pix_fmt yuv420p -movflags +faststart \
-  -c:a aac -b:a 192k -af "afade=t=in:d=0.3,afade=t=out:st=58.8:d=1.2" -shortest "$OUT"
+ffmpeg -nostdin -hide_banner -loglevel error -y -i "$TMP/video.mp4" -i "$MUSIC" -map 0:v -map 1:a -c:v libx264 -crf 25 -preset slow -pix_fmt yuv420p -movflags +faststart \
+  -c:a aac -b:a 160k -af "afade=t=in:d=0.3,afade=t=out:st=58.8:d=1.2" -shortest "$OUT"
 rm -rf "$TMP"
 echo "wrote $OUT"
