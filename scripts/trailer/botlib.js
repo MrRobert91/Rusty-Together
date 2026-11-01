@@ -68,17 +68,26 @@
       bot.t += dt
       bot.stepT += dt
       const s = bot.plan[bot.i]
-      if (!s) { bot.done = true; return }
+      if (!s) {
+        if (bot.rec && G.time > bot.recUntil) { bot.note('■ stop ' + bot.rec); bot.rec = null }
+        bot.done = !bot.rec
+        return
+      }
       if (s.enter && !s._entered) { s._entered = true; s.enter(bot) }
+      // Trailer capture: steps tagged with `clip` are recorded (plus a tail).
+      if (s.clip && bot.rec !== s.clip && bot.stepT >= (s.clipAfter ?? 0) && !s._clipped) { s._clipped = true; bot.rec = s.clip; bot.recUntil = Infinity; bot.recStart = G.time; bot.note('● rec ' + s.clip) }
+      if (s.clip && bot.rec === s.clip && s.clipMax && G.time - bot.recStart > s.clipMax) { bot.recUntil = G.time }
+      if (bot.rec && bot.recUntil !== Infinity && G.time > bot.recUntil) { bot.note('■ stop ' + bot.rec); bot.rec = null }
       let r = false
       try { r = s.run(bot, bot.stepT) } catch (e) { bot.fail = `${s.name}: ${e.message}`; return }
       if (r) {
+        if (s.clip && bot.rec === s.clip && bot.recUntil === Infinity) bot.recUntil = G.time + (s.tail ?? 1.2)
         bot.note(`✓ ${s.name} (${bot.stepT.toFixed(1)} s)`)
         bot.stop()
         for (const b of [...bot.held]) bot.release(b)
         bot.i++
         bot.stepT = 0
-        if (bot.i >= bot.plan.length) bot.done = true
+        if (bot.i >= bot.plan.length) bot.done = !bot.rec
       } else if (bot.stepT > (s.timeout ?? 40)) {
         if (s.optional) {
           bot.note(`~ skipped optional ${s.name}`)

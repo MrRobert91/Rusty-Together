@@ -13,6 +13,19 @@
   const room = () => G.checkpoint?.id
   const trace = (b, t, tag) => { if (Math.floor(t * 2) !== Math.floor((t - 1 / 60) * 2)) b.note(`${tag} me=${[me().pos.x, me().pos.y, me().pos.z].map((v) => v.toFixed(2))} g=${me().grounded} am=${[am().pos.x, am().pos.y, am().pos.z].map((v) => v.toFixed(2))} g=${am().grounded} hang=${am().hangOn}/${me().hangOn} form=${G.form} carry=${me().carrying}/${am().carrying} held=${G.bodies.get("boxR")?.heldBy}`) }
 
+  /* ---------------- Title shot: both robots, a high five, slow orbit ---------------- */
+  S('title', (b, t) => {
+    const k = Math.min(1, t / 6)
+    const ang = 0.9 - k * 1.3
+    const r = 7.2 - k * 2.2
+    window.__freeCam = { p: [Math.sin(ang) * r, 2.6 - k * 0.8, -1.2 + Math.cos(ang) * r], t: [0, 1.1, -1.4] }
+    if (t < 1.2) { b.goto(-0.55, -1.2, 0.1); P.goto(0.55, -1.2, 0.1) }
+    else { b.stop(); P.stop(); me().yaw = Math.PI / 2; am().yaw = -Math.PI / 2 }
+    if (t > 1.6 && !b._up) { b._up = 1; b.tap('emote1'); P.tap('emote1') }
+    if (t > 6) { delete window.__freeCam; return true }
+    return false
+  }, { clip: 'title', tail: 0, timeout: 12 })
+
   /* ---------------- Room 1: springboard + offered hand ---------------- */
   S('kick-about', (b, t) => {
     // A quick goal while waiting (optional fun).
@@ -41,7 +54,7 @@
       if (m.vel.y < -1) b.release('jump')
     }
     return feet(m) > 2 && m.grounded && m.pos.z < -12.3
-  }, { timeout: 30 })
+  }, { clip: 'l1_spring', timeout: 30 })
   S('offer hand, Ámbar climbs', (b, t) => {
     trace(b, t, 'hand')
     const a = am()
@@ -57,7 +70,7 @@
       if (a.vel.y < 0) P.release('jump')
     }
     return room() === 'c1b' || (feet(a) > 2 && a.grounded && a.pos.z < -12.2)
-  }, { timeout: 40 })
+  }, { clip: 'l1_hand', clipMax: 4, tail: 1.5, timeout: 40 })
   S('Ámbar to the gap edge', (b) => {
     P.releaseAll()
     b.releaseAll?.()
@@ -87,7 +100,7 @@
     b.stickTo(0, -0.25, 0.3)
     if (m.vel.y < 1 && feet(m) > 4) { b.release('jump'); b.hold('context') }
     return false
-  }, { timeout: 40 })
+  }, { clip: 'l1_ring', tail: 1.5, timeout: 40 })
   S('land across', (b) => { b.release('context'); return me().grounded && b.goto(0.3, -27.2, 0.4) })
   S('hand across the gap', (b, t) => {
     trace(b, t, 'gap')
@@ -129,7 +142,7 @@
       return false
     }
     return !!G.vars['sw:sockL']
-  }, { timeout: 60 })
+  }, { clip: 'l1_belt', clipAfter: 2.5, clipMax: 3.5, tail: 0.5, timeout: 60 })
   S('Cian holds the other switch, Ámbar delivers', (b, t) => {
     trace(b, t, 'belt2')
     b.goto(-3, -45.3, 0.15)
@@ -151,7 +164,7 @@
     const ok2 = P.goto(1.0, -74, 0.4)
     if (ok1 && ok2) { b.hold('context'); P.hold('context') }
     return G.form === 'joined'
-  }, { timeout: 60 })
+  }, { clip: 'l1_merge', clipAfter: 4.5, tail: 2.0, timeout: 60 })
   S('walk joined', (b) => {
     b.releaseAll?.(); b.release('context'); P.releaseAll()
     P.syncJump = false
@@ -169,7 +182,7 @@
     const z = G.big.pos.z
     if (G.big.grounded && ((z < -97.4 && z > -98.2) || (z < -105.4 && z > -106.2))) b.tap('jump')
     return room() === 'c5'
-  }, { timeout: 40 })
+  }, { clip: 'l1_joint', clipAfter: 1.5, tail: 0.5, timeout: 40 })
 
   /* ---------------- Room 5: crane monkey bars + slingshot ---------------- */
   const arm = (i) => G.big.arms[i].cable
@@ -206,7 +219,7 @@
     }
     if (Bb.dead) { b._ph = 0; P.pilotReel = false }
     return Bb.grounded && Bb.pos.z < -153.3 && Bb.pos.y > 3.6
-  }, { timeout: 60 })
+  }, { clip: 'l1_bars', clipMax: 7.5, tail: 1.0, timeout: 60 })
   S('slingshot', (b, t) => {
     btrace(b, t, 'sling')
     const Bb = G.big
@@ -222,7 +235,7 @@
     if (R.state === 'idle' && b._rf && t > 1) b._rf = 0
     if (Bb.tension > 0.97) { b.release('context'); P.pilotReel = false; b._fired = t }
     return Bb.grounded && Bb.pos.z < -166
-  }, { timeout: 40 })
+  }, { clip: 'l1_sling', tail: 1.5, timeout: 40 })
 
   /* ---------------- Room 6: the sorting crab ---------------- */
   S('split for the latches', (b) => {
@@ -250,7 +263,7 @@
       else P.release('context')
     } else { P.release('context'); P.aim = null; P.goto(1.2, -173, 0.4) }
     return !!G.vars.crabOpen
-  }, { timeout: 90 })
+  }, { clip: 'l1_latch', clipAfter: 1.5, clipMax: 4.5, tail: 1.0, timeout: 90 })
   S('couple on the arena plate', (b) => {
     P.aim = null
     const ok1 = b.goto(-1.0, -175.5, 0.4)
@@ -277,7 +290,7 @@
     if (pry < 1) { b.stop(); P.syncMove = false; P.pilotMove = pullBack }
     else { b.stickTo(0, 1); P.pilotMove = V(0, 0, 0) }
     return G.vars.fuse === 'carried'
-  }, { timeout: 40 })
+  }, { clip: 'l1_pry', clipMax: 3, tail: 0.3, timeout: 40 })
   S('fuse to the socket', (b, t) => {
     btrace(b, t, 'fuse')
     P.pilotMove = null; P.syncMove = true
@@ -297,8 +310,8 @@
       if (Bb.grounded && Math.hypot(Bb.pos.x - (tx + 2.6), Bb.pos.z - (tz + 1.8)) < 1.2) b.tap('jump')
     } else b.goto(tx, tz, 0.3)
     return G.vars.fuse === 'inserted'
-  }, { timeout: 60 })
-  S('level complete', (b) => { b.stop(); return !!window.__levelDone }, { timeout: 20 })
+  }, { clip: 'l1_fuse', tail: 0.3, timeout: 60 })
+  S('level complete', (b) => { b.stop(); return !!window.__levelDone }, { clip: 'l1_rank', tail: 6.5, timeout: 20 })
 
   B.run(plan)
   B.releaseAll = () => { for (const k of [...B.held]) B.release(k) }

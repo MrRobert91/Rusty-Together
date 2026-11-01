@@ -26,7 +26,7 @@
     if ((G.vars['goals:t'] ?? 0) > 0) return true
     if (t - b._kicked > 2.5) b._kicked = 0
     return false
-  }, { timeout: 30 })
+  }, { clip: 't_kick', tail: 2.2, timeout: 30 })
   S('mushroom nut', (b, t) => {
     if (G.vars['nut:tn1']) return b.goto(2.0, -9.6, 0.5) && me().grounded
     return b.bounceOn(4.2, -10.8) && false
@@ -130,7 +130,7 @@
     }
     if (feet() < 4.6 && m.grounded && t > 3) b._go = 0
     return step() === 'hand'
-  }, { timeout: 60 })
+  }, { clip: 't_spring', clipAfter: 1.5, tail: 1.0, timeout: 60 })
   S('offer hand', (b, t) => {
     if (b.goto(0.2, -69.05, 0.18)) { me().yaw = 0; b.hold('grab') }
     return step() === 'cross'
@@ -155,7 +155,7 @@
   S('couple', (b) => {
     if (b.goto(0.9, -91.4, 0.4)) b.hold('context')
     return G.form === 'joined'
-  }, { timeout: 40 })
+  }, { clip: 't_merge', clipAfter: 1.0, tail: 2.0, timeout: 40 })
   S('walk joined', (b) => { b.look(0, 0.36); b.stickTo(0, -1); return step() === 'hop' }, { timeout: 30 })
   S('hop', (b) => {
     b.stickTo(0, -1)
@@ -166,7 +166,7 @@
     b.stickTo(0, -1)
     if (G.big.grounded && G.big.pos.z < -102.9 && G.big.pos.z > -104) b.tap('jump')
     return step() === 'sling'
-  }, { timeout: 30 })
+  }, { clip: 't_joint', tail: 1.0, timeout: 30 })
   S('slingshot', (b, t) => {
     const B = G.big
     if (!b._a) { if (b.goto(0, -111.6, 0.3)) b._a = 1; return false }
@@ -184,7 +184,7 @@
       if (b.goto(a.pos.x, a.pos.z + 1.2, 1.2)) { me().yaw = Math.PI; b.tap('punch'); b._five = 1 }
     } else if (t > 3 && !b._raised) { b.tap('emote1'); b._raised = 1 }
     return false
-  }, { timeout: 15 })
+  }, { clip: 't_five', tail: 1.8, timeout: 15 })
   S('finish nut', (b) => {
     if (G.vars['nut:tn5']) return b.goto(1.5, -127, 0.5) && me().grounded
     return b.bounceOn(4.4, -125.2) && false

@@ -11,6 +11,16 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
 | ![Escuela de guantes](docs/screens/glove-school.jpg) | ![Cintas cruzadas](docs/screens/conveyors.jpg) |
 | ![Tirachinas del cuerpo unido](docs/screens/slingshot.jpg) | ![Cangrejo clasificador](docs/screens/crab.jpg) |
 
+🎬 **Tráiler (1 min, gameplay real):** [`docs/trailer.mp4`](docs/trailer.mp4)
+
+## Novedades: ¡a jugar en serio (y en broma)!
+
+- **Sincronía.** Todo lo que hacéis *juntos* suelta chispas con una onomatopeya de cómic y puntos: rebotar en la cabeza del otro (¡BOING!), coger su mano en el aire (¡TE TENGO!), subirlo (¡ARRIBA!), saltos conjuntos (¡HOP!, y ¡PERFECTO! si pulsáis casi a la vez), anillos, tirachinas, choques de manos, tuercas, goles, golpes al cangrejo y puntos de control. Si encadenáis jugadas en menos de 6 s sube un **multiplicador compartido ×2…×5** con su barra de cadena y un acorde que sube de tono. Al terminar, la tarjeta final estampa un **rango S/A/B/C**.
+- **¡Choca esos cinco!** Levanta la mano (gesto 1: tecla 1 / cruceta ↑ / 🖐️) y tu compañero te la choca con *Pegar*, o levantadla los dos estando cerca. Ámbar-bot te ofrece la mano después de los grandes momentos del tutorial, celebra cada paso que superas y te devuelve el gesto si se lo pides.
+- **Juguetes.** Pelota de playa y portería con marcador al principio del tutorial y del nivel 1 (se chuta con *Pegar* o a empujones), **setas-muelle** que te lanzan por los aires y **tuercas doradas** escondidas: 5 en el tutorial y 7 en el nivel 1, con contador en el HUD.
+- **Más jugo.** Rastros brillantes al salir disparado, líneas de velocidad, motas doradas flotando al sol, guirnaldas de fiesta, un cielo más cálido y sonidos nuevos (palmada, moneda, boing, gol, combo).
+- **Trampolín más fiable.** Aterrizar en la cabeza del compañero siempre rebota (antes un aterrizaje suave te dejaba encima resbalando) y saltar estando encima también te impulsa.
+
 ## Qué incluye
 
 - **Tutorial para un jugador, «Taller de pruebas».** Enseña cada verbo de uno en uno: moverse, salto variable, cajas, pegar (un botón que abre una reja), gancho, balanceo y muelle. Después aparece **Ámbar-bot**, un compañero IA hecho con Yuka. Lo despiertas de un golpe y con él se aprenden el trampolín (saltar sobre su cabeza), la mano ofrecida, el rescate en el aire, el acoplamiento, el salto unilateral frente al conjunto, el tirachinas y la separación.
@@ -63,7 +73,7 @@ Cuatro botones de acción, colocados como en el mando de GameCube: **Saltar** gr
 | **X** · Pegar (rojo) | Clic izq. / F | **Pegar**: empuja a tu compañero, golpea al cangrejo, toca campanas y activa botones. Con caja, la lanza | Golpe de brazo: campanas, botones, enemigos |
 | **Y** / RT · Acción (violeta) | Clic der. / Q / R | **Contextual**: con un anillo iluminado, mantén para engancharte y recoger (cargado = muelle; un toque = tirón). En una placa, mantén para acoplaros | Con un anillo iluminado: lanzar tu brazo y tensar (tirachinas = soltad a la vez). Sin anillo: mantén para separaros |
 | RB | G | Señalar un punto | Señalar |
-| Cruceta | 1-4 | Gestos | Gestos |
+| Cruceta | 1-4 | Gestos (↑ / 1 = mano arriba: ¡choca esos cinco!) | Gestos |
 | — | V / M | Pulsar para hablar / silenciar | |
 
 ### Móvil y tableta
@@ -160,6 +170,20 @@ Sigue el GDD: el anfitrión valida y el invitado envía intenciones.
 ```bash
 npm run typecheck
 npm test
+```
+
+### Partidas automáticas y tráiler
+
+`scripts/trailer/` juega el tutorial y el nivel 1 completos sin intervención, con las mismas entradas que un jugador. Un reloj virtual (`vclock.js`) congela `performance.now`, los temporizadores y `requestAnimationFrame`, así que funciona igual en un Chromium sin GPU: el bot del tutorial juega con Ámbar-bot, y el del nivel 1 maneja a Cian con el stick/botones y a Ámbar como segundo jugador a través del driver de IA.
+
+```bash
+scripts/trailer/restart-frozen.sh                      # Vite sin HMR en :5174
+node scripts/trailer/playtest.cjs tutorial             # → DONE | levelDone: true
+node scripts/trailer/playtest.cjs level1               # → DONE | levelDone: true
+scripts/trailer/run-capture.sh /tmp/frames             # graba los clips del tráiler (30 fps)
+python3 scripts/trailer/music.py /tmp/music.wav         # música del tráiler (sintetizada)
+node scripts/trailer/cards.cjs /tmp/cards               # rótulos
+sh scripts/trailer/edit.sh /tmp/frames /tmp/cards /tmp/music.wav docs/trailer.mp4
 ```
 
 Además, durante el desarrollo se jugó la partida en Chromium sin interfaz con dos clientes reales (anfitrión e invitado). Se verificaron:
