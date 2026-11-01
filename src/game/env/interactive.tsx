@@ -11,6 +11,7 @@ import { GEO, M } from '../robots/materials'
 import { useRigMerge } from '../perf/StaticBatch'
 import { BIG, BTN_COLOR, COLORS, MINI, SLOT_COLOR } from '../tuning'
 import { fx } from '../runtime'
+import { spark } from '../fun/sync'
 
 /* ------------------------------------------------------------ helpers */
 
@@ -276,6 +277,7 @@ export function PunchButton({ id, pos, rotY = 0, latch = true, holdS = 4, color 
       fx('sfx', { n: 'lever', p: face })
       fx('sfx', { n: 'success', p: face, v: 0.6 })
       fx('particles', { n: 'burst', p: face, c: color, s: 0.6 })
+      spark('button', face)
       onPress?.(slot as 0 | 1)
     })
     return () => { G.anchors.delete(id); G.punchHandlers.delete(id) }

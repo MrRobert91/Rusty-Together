@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 1280px; height: 720px; background: transparent; font-family: 'Fredoka', ui-rounded, sans-serif; color: #f6eedc; overflow: hidden; }
+  .card { position: absolute; inset: 0; display: none; }
+  .card.on { display: block; }
+  .logo { position: absolute; left: 0; right: 0; text-align: center; filter: drop-shadow(0 10px 30px rgba(0,0,0,.55)); }
+  .logo-main { font-size: 132px; font-weight: 700; letter-spacing: .02em; line-height: .9; color: #f6eedc; -webkit-text-stroke: 5px #1a2130; paint-order: stroke fill; }
+  .logo-main .c { color: #22c7d6; } .logo-main .u { color: #ff9a1f; }
+  .logo-main .a { color: #fff; font-size: .7em; display: inline-block; transform: rotate(-8deg) translateY(-4px); }
+  .logo-sub { font-size: 24px; letter-spacing: .5em; font-weight: 600; margin-top: 12px; -webkit-text-stroke: 1px #1a2130; }
+  .cap { position: absolute; left: 64px; bottom: 74px; max-width: 900px; }
+  .cap b { display: inline-block; font-size: 64px; font-weight: 700; line-height: 1; color: #fff; -webkit-text-stroke: 7px #141a2a; paint-order: stroke fill; text-shadow: 0 6px 0 #141a2a, 0 14px 30px rgba(0,0,0,.4); transform: rotate(-2deg); font-style: italic; }
+  .cap i { display: block; margin-top: 12px; font-style: normal; font-size: 26px; font-weight: 600; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.8); -webkit-text-stroke: 1px rgba(20,26,42,.6); }
+  .cap.r { left: auto; right: 64px; text-align: right; }
+  .cap.r b { transform: rotate(2deg); }
+  .y { color: #ffd23a !important; } .c2 { color: #7cf5ff !important; } .o { color: #ffb347 !important; } .p { color: #ff7ad9 !important; } .g { color: #8dff9a !important; }
+  .end { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(14,26,43,.35), rgba(8,12,20,.82)); }
+  .tag { position: absolute; left: 0; right: 0; text-align: center; font-size: 26px; font-weight: 600; letter-spacing: .04em; }
+  .pill { display: inline-block; margin: 0 6px; padding: 8px 18px; border-radius: 999px; background: rgba(16,24,38,.82); border: 1px solid rgba(255,255,255,.18); font-size: 20px; }
+  .cta { position: absolute; left: 0; right: 0; text-align: center; font-size: 40px; font-weight: 700; color: #ffd23a; -webkit-text-stroke: 4px #141a2a; paint-order: stroke fill; }
+</style></head>
+<body>
+  <div class="card" id="title"><div class="logo" style="top: 210px"><div class="logo-main"><span class="c">DOS</span> <span class="a">A</span> <span class="u">UNO</span></div><div class="logo-sub">RUSTY TOGETHER</div></div></div>
+  <div class="card" id="c1"><div class="cap"><b class="c2">Dos robots.</b></div></div>
+  <div class="card" id="c2"><div class="cap r"><b class="o">Un cuerpo.</b></div></div>
+  <div class="card" id="c3"><div class="cap"><b>Ningún acuerdo</b><i>sobre dónde poner el pie.</i></div></div>
+  <div class="card" id="c4"><div class="cap"><b class="y">¡Trampolín humano!</b><i>Salta en la cabeza de tu compañero.</i></div></div>
+  <div class="card" id="c5"><div class="cap r"><b class="g">Échale una mano.</b><i>Literalmente.</i></div></div>
+  <div class="card" id="c6"><div class="cap"><b class="p">¡Choca esos cinco!</b></div></div>
+  <div class="card" id="c7"><div class="cap r"><b class="y">Combos de Sincronía</b><i>Encadenad jugadas cooperativas hasta ×5.</i></div></div>
+  <div class="card" id="c8"><div class="cap"><b class="o">Un tirachinas.</b><i>Para dos.</i></div></div>
+  <div class="card" id="c9"><div class="cap r"><b class="c2">Y un cangrejo</b><i>clasificador. Gigante. Con pinzas.</i></div></div>
+  <div class="card" id="c10"><div class="cap"><b class="g">¿Llegaréis a la S?</b></div></div>
+  <div class="card" id="c11"><div class="cap"><b>Pasamanos de grúas</b><i>Un brazo sujeta, el otro avanza.</i></div></div>
+  <div class="card" id="c12"><div class="cap r"><b class="y">¡GOOOL!</b><i>Hay tiempo para todo.</i></div></div>
+  <div class="card" id="end">
+    <div class="end"></div>
+    <div class="logo" style="top: 170px"><div class="logo-main"><span class="c">DOS</span> <span class="a">A</span> <span class="u">UNO</span></div><div class="logo-sub">RUSTY TOGETHER</div></div>
+    <div class="tag" style="top: 418px"><span class="pill">🎮 Cooperativo online para 2</span><span class="pill">🎙 Chat de voz por proximidad</span><span class="pill">📱 Móvil, mando o teclado</span></div>
+    <div class="cta" style="top: 500px">¡Jugad juntos en el navegador!</div>
+  </div>
+<script>
+  const id = new URLSearchParams(location.search).get('card')
+  document.getElementById(id)?.classList.add('on')
+</script>
+</body></html>

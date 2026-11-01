@@ -13,6 +13,7 @@ import { Arena } from './Arena'
 import { CrabRoom } from './Crab'
 import { MINI } from '../../tuning'
 import { Pendulum, Sweeper } from '../../env/hazards'
+import { BeachBall, Bunting, Goal, GoalBoard, Mushroom, Pole } from '../../env/toys'
 import { Airship, Bollard, CargoLine, CargoStack, Container, DockCrane, DockSkyline, Fenders, Flag, Gulls, HazardEdge, LampPost, Pipes, SteamVent, Windsock, CARGO } from '../../env/docks'
 
 /*
@@ -108,6 +109,13 @@ function Room1() {
       <SafetyNet pos={[-8.25, -1.6, -5]} size={[4.5, 7]} returnTo={[-4.5, 0, -5]} />
       <Sign pos={[-5.2, 2.2, -8.6]} rotY={0.6} text="Práctica" sub="mantén Acción · suelta" small />
       <GoldenNut id="n1" pos={[-13.5, 1.2, -5]} />
+      {/* Kick-about while you wait for your partner */}
+      <BeachBall id="l1" pos={[1.6, 1, -8]} />
+      <Goal id="l1" ball="l1" pos={[4.3, 0, -8.9]} rotY={-Math.PI / 2} />
+      <GoalBoard id="l1" pos={[5.4, 0, -12.2]} rotY={-0.5} />
+      <Pole pos={[-5.6, 0, 1.6]} />
+      <Pole pos={[5.6, 0, 1.6]} color="#22c7d6" />
+      <Bunting a={[-5.6, 4.3, 1.6]} b={[5.6, 4.3, 1.6]} />
 
       {/* B: the wall (2.4 m) — springboard + offered hand */}
       <Block pos={[0, 2.4, -17]} size={[10, 10.4, 10]} />
@@ -200,6 +208,8 @@ function Room2() {
       <LampPost pos={[7.3, 2.4, -51.2]} rotY={-0.7} />
       <SteamVent pos={[-5.6, 2.4, -60]} every={2.7} />
       <Flag pos={[-7.4, 2.4, -51.2]} color="#e8483b" h={5} />
+      <Mushroom pos={[6.3, 2.4, -57.6]} color={0} />
+      <GoldenNut id="n6" pos={[6.3, 7.4, -57.6]} />
     </>
   )
 }
@@ -245,6 +255,9 @@ function Room4() {
       <LampPost pos={[6.3, 2.4, -67]} rotY={-2.2} />
       <Flag pos={[-6.4, 2.4, -81.2]} color="#22c7d6" h={4.6} />
       <Flag pos={[6.4, 2.4, -81.2]} color="#ff9a1f" h={4.6} />
+      <Mushroom pos={[-5, 2.4, -69.6]} color={3} />
+      <GoldenNut id="n7" pos={[-5, 7.4, -69.6]} />
+      <Bunting a={[-6.3, 5.6, -67]} b={[6.3, 5.6, -67]} />
       {/* Joined-body hazard: a crated load swinging across the walkway */}
       <Pendulum pivot={[0, 9.4, -87.6]} floor={-9} length={5.8} amp={0.62} period={4.2} span={7.4} force={6} bias={[0, 0, 1]} bob={[1.5, 1.3, 1.5]} />
       <Sign pos={[-3.4, 4.2, -83.2]} rotY={0.6} text="Carga suelta" sub="esperad a que pase" small />
@@ -367,6 +380,8 @@ function CrabArenaGeometry() {
       <LampPost pos={[-13, 3.4, -165.8]} rotY={2.4} h={4.4} />
       <Flag pos={[-12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
       <Flag pos={[12.8, 3.4, -188.4]} color="#ffd23a" h={6} />
+      <Bunting a={[-13, 7.6, -165.8]} b={[13, 7.6, -165.8]} sag={1.6} />
+      <Bunting a={[-12.8, 9.2, -188.4]} b={[12.8, 9.2, -188.4]} sag={2} />
       <HazardEdge pos={[0, 3.4, -164.92]} len={28} />
       <CargoStack pos={[11.6, 3.4, -169]} rotY={Math.PI / 2} cols={2} layers={2} seed={41} />
       <CargoStack pos={[-11.8, 3.4, -168.6]} rotY={Math.PI / 2} cols={1} layers={3} seed={43} />

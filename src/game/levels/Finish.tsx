@@ -7,6 +7,7 @@ import { envMat } from '../env/blocks'
 import { GEO, M } from '../robots/materials'
 import { useHud } from '../hud'
 import { sfx, setMusic, stinger } from '../../core/audio'
+import { syncState } from '../fun/sync'
 
 type V3 = [number, number, number]
 
@@ -22,7 +23,9 @@ export function completeLevel() {
     'Caídas': s.falls,
   }
   if (s.bells[0] + s.bells[1] > 0) stats['Campanas (Cian / Ámbar)'] = `${s.bells[0]} / ${s.bells[1]}`
-  fx('levelDone', { time, medals: [...G.medals], stats })
+  stats['Mejor cadena'] = `×${Math.min(5, syncState.best)}`
+  if (G.vars.nutsTotal) stats['Tuercas doradas'] = `${G.vars.nuts ?? 0} / ${G.vars.nutsTotal}`
+  fx('levelDone', { time, medals: [...G.medals], stats, score: syncState.score, best: syncState.best, sparks: syncState.sparks })
 }
 
 export function useLevelDoneListener() {
@@ -33,7 +36,7 @@ export function useLevelDoneListener() {
     fx('particles', { n: 'confetti', p: G.cam.target }, false)
     window.setTimeout(() => {
       if (document.pointerLockElement) document.exitPointerLock()
-      useHud.setState({ levelDone: { time: e.time, medals: e.medals, stats: e.stats } })
+      useHud.setState({ levelDone: { time: e.time, medals: e.medals, stats: e.stats, score: e.score, best: e.best, sparks: e.sparks } })
     }, 2200)
   }), [])
 }

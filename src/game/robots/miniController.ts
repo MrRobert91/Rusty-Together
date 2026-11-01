@@ -6,6 +6,8 @@ import type { StepInput } from '../control'
 import { lineOfSight, newGroundHit, probeGround, raycastPoint, wallProbe } from './physicsUtil'
 import { settings } from '../../core/settings'
 import { rumble } from '../../core/input'
+import { spark } from '../fun/sync'
+import { FIVE_WINDOW, highFive } from '../fun/highfive'
 
 /**
  * Character controller for a mini robot owned by this client (human or AI).
@@ -83,7 +85,7 @@ export function killMini(m: Mini) {
 }
 
 function releaseAll(m: Mini) {
-  if (m.carrying) { act('drop', { id: m.carrying, v: [0, 0, 0] }); m.carrying = null }
+  if (m.carrying) { act('drop', { id: m.carrying, v: [0, 0, 0] }, m.slot); m.carrying = null }
   m.cable.state = m.cable.state === 'idle' ? 'idle' : 'retract'
   m.cable.anchorId = null
   m.cable.charge = 0
@@ -150,7 +152,7 @@ export function pickMiniTarget(world: World, m: Mini, aim: Vector3, partner: Min
 /** What the contextual button hooks (rings, crab latches, the partner's offered hand). */
 const HOOKABLE = new Set(['ring', 'latch', 'glove'])
 /** What a punch can hit besides the partner. */
-const PUNCHABLE = new Set(['bell', 'button', 'enemy'])
+const PUNCHABLE = new Set(['bell', 'button', 'enemy', 'ball'])
 
 /**
  * Punch target: the nearest bell / button / enemy within reach, else the
@@ -239,6 +241,8 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   }
 
   if (m.grounded) { l.clingUsed = false; m.cling = false }
+  // Standing on the partner's head: a jump from there is a springboard too.
+  const onHead = m.grounded && gh.ud.robot === partner.slot + 1 && !partner.hidden && partner.hangOn < 0 && !m.towing
   if (!wasGrounded && m.grounded) {
     const impact = clamp(-l.prevVy / 16, 0.15, 1)
     m.landT = t
@@ -260,19 +264,23 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
       m.grounded = false
       m.jumpT = t
       m.landT = t
-      fx('sfx', { n: 'spring', p: m.pos })
+      m.boosting = 0.5 // full height even if jump isn't held
+      fx('sfx', { n: 'boing', p: m.pos, pt: 0.9 + Math.random() * 0.25 })
       fx('particles', { n: 'stars', p: { x: m.pos.x, y: m.pos.y - 0.4, z: m.pos.z } })
+      spark('pad', m.pos)
     }
     // Springboard: landing on the partner's head always bounces you up.
-    if (gh.ud.robot === partner.slot + 1 && !partner.hidden && l.prevVy < -0.5 && !m.towing && partner.hangOn < 0) {
+    if (gh.ud.robot === partner.slot + 1 && !partner.hidden && l.prevVy < 2.6 && !m.towing && partner.hangOn < 0) {
       v.y = MINI.boostVel
       m.grounded = false
       m.jumpT = t
       m.boosting = 0.6
       m.launchedT = 0.15
       fx('sfx', { n: 'boost', p: m.pos })
+      fx('sfx', { n: 'boing', p: m.pos })
       fx('particles', { n: 'stars', p: { x: m.pos.x, y: m.pos.y - 0.4, z: m.pos.z } })
       fx('boost', { slot: partner.slot })
+      spark('boing', m.pos)
     }
   }
   l.prevVy = v.y
@@ -332,7 +340,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
         m.hangOn = -1
         m.jumpT = t
         if (m.cable.anchorId?.startsWith('glove')) { m.cable.state = 'retract'; m.cable.anchorId = null }
-        if (holder.hoist >= 0.98) act('rescue', { holder: holder.slot })
+        if (holder.hoist >= 0.98) { act('rescue', { holder: holder.slot }); spark('rescue', m.pos) }
         fx('sfx', { n: 'boost', p: m.pos })
         fx('particles', { n: 'stars', p: { x: m.pos.x, y: m.pos.y + 0.5, z: m.pos.z } })
       } else if (letGo) {
@@ -436,13 +444,14 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
       m.hangT = 0
       fx('sfx', { n: 'grab', p: m.pos })
       fx('particles', { n: 'burst', p: partner.glove, c: '#ffffff', s: 0.5 })
+      spark('catch', partner.glove)
     }
   }
   if (inp.pressed.grab) {
     if (m.carrying) {
       // Drop (and never re-grab in the same press).
       facing(m, fwd)
-      act('drop', { id: m.carrying, v: [v.x * 0.5 + fwd.x * 1.4, 1.6, v.z * 0.5 + fwd.z * 1.4] })
+      act('drop', { id: m.carrying, v: [v.x * 0.5 + fwd.x * 1.4, 1.6, v.z * 0.5 + fwd.z * 1.4] }, m.slot)
       m.carrying = null
       fx('sfx', { n: 'release', p: m.pos })
     } else {
@@ -456,6 +465,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
           took = true
           fx('sfx', { n: 'grab', p: m.pos })
           fx('particles', { n: 'burst', p: partner.glove, c: '#ffffff', s: 0.5 })
+          if (!m.grounded) spark('catch', partner.glove)
         }
       }
       if (!took && m.hangOn < 0) {
@@ -463,7 +473,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
         if (box) {
           m.carrying = box
           m.offering = false
-          act('grab', { id: box })
+          act('grab', { id: box }, m.slot)
           fx('sfx', { n: 'grab', p: m.pos })
         } else if (canTow(m, partner)) {
           // Grab the partner's body: they come with you while you hold.
@@ -528,7 +538,20 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   /* ---- vertical ---- */
   if (inp.pressed.jump) l.jumpBuf = t
   const coyoteOk = t - l.lastGround < MINI.coyote
-  if (t - l.jumpBuf < MINI.buffer && (m.grounded || coyoteOk) && m.cable.state !== 'attached' && !stunned) {
+  if (onHead && t - l.jumpBuf < MINI.buffer && m.cable.state !== 'attached' && !stunned) {
+    v.y = MINI.boostVel
+    m.grounded = false
+    m.jumpT = t
+    m.boosting = 0.6
+    m.launchedT = 0.15
+    l.jumpBuf = -9
+    l.lastGround = -9
+    fx('sfx', { n: 'boost', p: m.pos })
+    fx('sfx', { n: 'boing', p: m.pos })
+    fx('particles', { n: 'stars', p: { x: m.pos.x, y: m.pos.y - 0.4, z: m.pos.z } })
+    fx('boost', { slot: partner.slot })
+    spark('boing', m.pos)
+  } else if (t - l.jumpBuf < MINI.buffer && (m.grounded || coyoteOk) && m.cable.state !== 'attached' && !stunned) {
     const jv = jumpVel * (m.carrying ? 0.82 : 1)
     v.y = jv + Math.max(0, gv.y)
     m.grounded = false
@@ -563,7 +586,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   if (inp.pressed.punch && t - m.punchT > MINI.punchCooldown && m.hangOn < 0) {
     if (m.carrying) {
       facing(m, fwd)
-      act('drop', { id: m.carrying, v: [v.x + fwd.x * 7.5, 4.5, v.z + fwd.z * 7.5] })
+      act('drop', { id: m.carrying, v: [v.x + fwd.x * 7.5, 4.5, v.z + fwd.z * 7.5] }, m.slot)
       m.carrying = null
       m.punchT = t
       fx('sfx', { n: 'whoosh', p: m.pos })
@@ -639,8 +662,15 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
       if (!c.hit) { c.state = 'retract'; return }
       const a = c.anchorId ? G.anchors.get(c.anchorId) : null
       if (c.anchorId?.startsWith('robot:')) {
+        // Partner holding a hand up (emote 1): that's a high five, not a shove.
+        if (partner.emote === 1 && t - partner.emoteT < FIVE_WINDOW && !G.vars.arenaLive) {
+          highFive(m, partner)
+          c.state = 'retract'
+          return
+        }
         // Playful punch. Strong inside the arena, gentle elsewhere.
         tmp.copy(partner.pos).sub(m.pos).setY(0).normalize()
+        fx('pop', { text: Math.random() < 0.5 ? '¡PAF!' : '¡POING!', p: [partner.pos.x, partner.pos.y, partner.pos.z], c: '#ffffff' })
         const strong = !!G.vars.arenaLive
         punchPartner(partner, tmp, strong ? 7.5 : 3.5)
         fx('sfx', { n: 'bonk', p: partner.pos })
@@ -653,8 +683,8 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
       fx('sfx', { n: c.punch ? 'bonk' : 'cableHit', p: a.pos })
       fx('particles', { n: c.punch ? 'stars' : 'spark', p: a.pos })
       if (c.punch) {
-        if (a.kind === 'bell') act('bell', { id: a.id })
-        else act('punch', { id: a.id })
+        if (a.kind === 'bell') act('bell', { id: a.id }, m.slot)
+        else act('punch', { id: a.id }, m.slot)
         if (m.kind === 'local') rumble(0.4, 0.3, 70)
         c.state = 'retract'
         return
@@ -677,6 +707,7 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
       c.state = 'attached'
       c.len = Math.max(MINI.minRope, m.pos.distanceTo(a.pos))
       G.stats.rings++
+      if (a.kind === 'ring') spark('ring', a.pos)
       if (m.kind === 'local') rumble(0.2, 0.4, 60)
     } else {
       c.tip.addScaledVector(tmp, step / d)
@@ -759,6 +790,7 @@ function springLaunch(m: Mini, a: Anchor, inp: StepInput) {
   m.grounded = false
   fx('sfx', { n: 'spring', p: m.pos })
   fx('particles', { n: 'burst', p: m.pos, c: m.slot === 0 ? '#5ef0ff' : '#ffb347' })
+  if (speed > 13) spark('swing', m.pos)
   if (m.kind === 'local') rumble(0.6, 0.6, 140)
 }
 

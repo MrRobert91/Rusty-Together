@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { spark } from '../fun/sync'
 import type { World } from '@dimforge/rapier3d-compat'
 import { G, act, ballistic, clamp, dampAngle, fx, type Combined, type Anchor } from '../runtime'
 import { BIG, GRAVITY } from '../tuning'
@@ -201,7 +202,7 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
       }
       const coyote = t - bl.lastGround < 0.14
       if (B.grounded || coyote) {
-        if (Math.abs(jt - B.jumpPress[other]) <= W && t - B.jumpPress[other] < W + 0.1) jointJump(B)
+        if (Math.abs(jt - B.jumpPress[other]) <= W && t - B.jumpPress[other] < W + 0.1) jointJump(B, Math.abs(jt - B.jumpPress[other]))
         else {
           v.y = BIG.hopVel + Math.max(0, gv.y)
           B.jumpKind = 'hop'
@@ -212,14 +213,14 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
           fx('sfx', { n: 'jump', p: B.pos })
         }
       } else if (B.jumpKind === 'hop' && bl.hopOwner === other && Math.abs(jt - B.jumpPress[other]) <= W && t - B.jumpT < 0.45) {
-        jointJump(B)
+        jointJump(B, Math.abs(jt - B.jumpPress[other]))
       }
       B.jumpPress[i] = jt
     }
     P[i].jumps.length = 0
   }
 
-  function jointJump(B: Combined) {
+  function jointJump(B: Combined, gap: number) {
     const along = avg.lengthSq() > 0.02 ? tmp2.copy(avg).normalize() : tmp2.set(Math.sin(B.yaw), 0, Math.cos(B.yaw))
     v.y = BIG.jointVel + Math.max(0, gv.y)
     v.x += along.x * BIG.jointForward
@@ -233,6 +234,8 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
     fx('particles', { n: 'dust', p: { x: B.pos.x, y: B.pos.y - BIG.feet, z: B.pos.z }, s: 1.8 })
     fx('particles', { n: 'stars', p: B.pos })
     fx('joint', {})
+    // Pressed within ~3 frames of each other: perfect sync.
+    spark(gap < 0.07 ? 'perfect' : 'joint', B.pos)
   }
 
   if (B.grounded && t - B.jumpT > 0.1) {
@@ -365,6 +368,7 @@ function stepArms(world: World, B: Combined, P: [PilotFrame, PilotFrame], dt: nu
         c.state = 'attached'
         c.len = Math.max(BIG.minRope, B.pos.distanceTo(a.pos))
         G.stats.rings++
+        spark('ring', a.pos)
         fx('sfx', { n: 'cableHit', p: a.pos })
         fx('particles', { n: 'spark', p: a.pos })
         fx('ringHit', { id: a.id, side: i })
@@ -460,6 +464,7 @@ function fireSling(B: Combined, a: Anchor, t: number) {
   fx('particles', { n: 'merge', p: B.pos })
   fx('shake', { a: 0.5 })
   fx('sling', {})
+  spark('sling', B.pos)
 }
 
 /** Couple-out consent: both pilots hold the contextual button on the ground with a free arm. */

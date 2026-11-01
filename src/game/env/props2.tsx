@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 import { G, addAnchor, fx, isHost } from '../runtime'
+import { spark } from '../fun/sync'
 import { hostSet } from '../net/replication'
 import { envMat, worldBox, type V3 } from './blocks'
 import { GEO, M } from '../robots/materials'
@@ -12,26 +13,38 @@ import { robotsIn } from './interactive'
 /* ------------------------------------------------------------ Golden nut collectibles */
 
 /** Optional team collectible placed where a little cooperation or curiosity pays off. */
+/** Nuts mounted in the current level (the HUD shows got / total). */
+const nutIds = new Set<string>()
+
 export function GoldenNut({ id, pos }: { id: string; pos: V3 }) {
   const g = useRef<THREE.Group>(null!)
+  const halo = useRef<THREE.Mesh>(null!)
   const c = useMemo(() => new THREE.Vector3(...pos), [pos])
   const half = useMemo(() => new THREE.Vector3(0.9, 1.2, 0.9), [])
   const key = `nut:${id}`
+  useEffect(() => {
+    nutIds.add(id)
+    if (isHost()) hostSet('nutsTotal', nutIds.size)
+    return () => { nutIds.delete(id) }
+  }, [id])
   useFrame((_, dt) => {
     const got = !!G.vars[key]
     g.current.visible = !got
     if (got) return
     g.current.rotation.y += dt * 2.2
     g.current.position.y = pos[1] + Math.sin(G.time * 2.5 + pos[0]) * 0.12
+    halo.current.scale.setScalar(0.75 + Math.sin(G.time * 5 + pos[2]) * 0.08)
     if (isHost()) {
       const who = robotsIn(new THREE.Vector3(c.x, c.y - 0.9, c.z), half)
       if (who.length) {
         hostSet(key, 1)
         const n = Object.keys(G.vars).filter((k) => k.startsWith('nut:') && G.vars[k]).length
         hostSet('nuts', n)
-        fx('sfx', { n: 'success', p: c })
+        fx('sfx', { n: 'coin', p: c, pt: 1 + n * 0.06 })
         fx('particles', { n: 'stars', p: c })
-        fx('toast', { text: `Tuerca dorada ${n}/5`, tone: 'good' })
+        fx('particles', { n: 'ring', p: c, c: '#ffd23a' })
+        fx('toast', { text: `Tuerca dorada ${n}/${nutIds.size}${n === nutIds.size ? ' · ¡todas!' : ''}`, tone: 'good' })
+        spark('nut', c)
       }
     }
   })
@@ -39,7 +52,7 @@ export function GoldenNut({ id, pos }: { id: string; pos: V3 }) {
     <group ref={g} position={pos}>
       <mesh geometry={useMemo(() => new THREE.CylinderGeometry(0.32, 0.32, 0.16, 6), [])} material={M.glow('#ffcf3a', 0.9)} rotation-x={Math.PI / 2} castShadow />
       <mesh geometry={GEO.cyl()} material={envMat('dark')} rotation-x={Math.PI / 2} scale={[0.13, 0.18, 0.13]} />
-      <mesh geometry={GEO.ringFlat()} material={M.basic('#fff3b0', 0.4)} scale={0.6} />
+      <mesh ref={halo} geometry={GEO.ringFlat()} material={M.basic('#fff3b0', 0.4)} scale={0.6} />
     </group>
   )
 }

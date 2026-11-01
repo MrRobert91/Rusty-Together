@@ -12,7 +12,7 @@ export const arr = (v: Vector3, p = 100): V3T => [Math.round(v.x * p) / p, Math.
 /* ------------------------------------------------------------ Anchors */
 
 /** `button` and `enemy` are punch targets; the rest are hook / grip points. */
-export type AnchorKind = 'ring' | 'glove' | 'latch' | 'bell' | 'handle' | 'robot' | 'button' | 'enemy'
+export type AnchorKind = 'ring' | 'glove' | 'latch' | 'bell' | 'handle' | 'robot' | 'button' | 'enemy' | 'ball'
 
 export interface Anchor {
   id: string
@@ -282,9 +282,12 @@ export function fx(k: string, e: Record<string, any> = {}, mirror = true) {
   if (mirror && G.session?.mode === 'online') G.session.send('ev', { k, e })
 }
 
-/** Guest → host interaction request (applied directly when we are the host). */
-export function act(k: string, d: Record<string, any> = {}) {
-  const s = localSlot()
+/**
+ * Guest → host interaction request (applied directly when we are the host).
+ * `from` names the robot acting when the host runs it (the solo AI partner).
+ */
+export function act(k: string, d: Record<string, any> = {}, from?: Slot) {
+  const s = isHost() && from !== undefined ? from : localSlot()
   if (isHost()) G.actHandlers.get(k)?.(s, d)
   else G.session?.send('act', { k, d })
 }

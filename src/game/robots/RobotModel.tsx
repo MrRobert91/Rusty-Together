@@ -195,9 +195,9 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
       if (!v.grounded && s.hang < 0.5) { ax = -1.9 - Math.sin(now * 10 + i) * 0.1; az = sgn * 0.5; bendA = 0.4 }
       if (s.carry > 0.01) { ax = THREE.MathUtils.lerp(ax, -2.75, s.carry); az = THREE.MathUtils.lerp(az, sgn * 0.25, s.carry); bendA = THREE.MathUtils.lerp(bendA, 0.55, s.carry) }
       // Emotes.
-      if (et < 1.6 && v.emote) {
+      if (et < (v.emote === 1 ? 2.6 : 1.6) && v.emote) {
         const e = v.emote
-        if (e === 1 && i === 1) { ax = -2.6; az = -0.4 + Math.sin(et * 14) * 0.35; bendA = 0.3 } // wave
+        if (e === 1 && i === 1) { ax = -2.75; az = -0.25 + Math.sin(et * 9) * 0.12; bendA = 0.15 } // hand up: «¡choca!»
         if (e === 2) { ax = -2.8; az = sgn * (0.4 + Math.sin(et * 16) * 0.15); bendA = 0.1 } // cheer
         if (e === 3 && i === 0) { ax = -1.4; az = 0.2; bendA = 0.2 } // point "aquí"
         if (e === 4) { ax = -0.6; az = sgn * 1.1; bendA = 1.2 } // shrug "¿?"
@@ -240,7 +240,7 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
     let expr: Expression = v.expression ?? 'normal'
     if (v.stun > 0) expr = 'dizzy'
     else if (et < 1.6 && v.emote === 2) expr = 'happy'
-    else if (et < 1.6 && v.emote === 1) expr = 'happy'
+    else if (et < 2.6 && v.emote === 1) expr = 'happy'
     else if (et < 1.6 && v.emote === 4) expr = 'surprised'
     else if (!v.grounded && v.vel.y < -12) expr = 'surprised'
     else if (s.hang > 0.5 || s.offer > 0.5) expr = 'determined'
