@@ -55,7 +55,7 @@ export function lineOfSight(world: World, a: Vector3, b: Vector3, exclude: Rigid
   if (len < 0.01) return true
   losRay.origin.x = a.x; losRay.origin.y = a.y; losRay.origin.z = a.z
   losRay.dir.x = dx / len; losRay.dir.y = dy / len; losRay.dir.z = dz / len
-  const h = world.castRay(losRay, len, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, exclude ?? undefined, (c) => !(c.parent()?.userData as any)?.robot)
+  const h = world.castRay(losRay, len, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, exclude ?? undefined, (c) => { const u = c.parent()?.userData as any; return !u?.robot && !u?.ball })
   return !h || h.timeOfImpact > len - slack
 }
 
@@ -63,7 +63,7 @@ export function lineOfSight(world: World, a: Vector3, b: Vector3, exclude: Rigid
 export function raycastPoint(world: World, a: Vector3, dir: Vector3, max: number, exclude: RigidBody | null, out: Vector3) {
   losRay.origin.x = a.x; losRay.origin.y = a.y; losRay.origin.z = a.z
   losRay.dir.x = dir.x; losRay.dir.y = dir.y; losRay.dir.z = dir.z
-  const h = world.castRay(losRay, max, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, exclude ?? undefined, (c) => !(c.parent()?.userData as any)?.robot)
+  const h = world.castRay(losRay, max, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, exclude ?? undefined, (c) => { const u = c.parent()?.userData as any; return !u?.robot && !u?.ball })
   if (!h) return -1
   out.copy(a).addScaledVector(dir, h.timeOfImpact)
   return h.timeOfImpact

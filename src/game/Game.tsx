@@ -23,6 +23,8 @@ import { resetVarListeners } from './net/replication'
 import type { Session } from '../net/session'
 import { useHud, toast } from './hud'
 import { setMusic } from '../core/audio'
+import { bindSync, resetSync } from './fun/sync'
+import { FunSystem } from './fun/FunSystem'
 
 export function Game({ level, session }: { level: string; session: Session }) {
   const def = LEVELS[level]
@@ -31,6 +33,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
     resetVarListeners()
     resetRuntime(level, session)
     resetSimulationState()
+    resetSync()
     def.setup()
     useHud.setState({ form: 'split', prompts: [], arena: null, levelDone: null, banner: null, roomTitle: null, objective: '', paused: false, stickers: useHud.getState().stickers })
     return true
@@ -42,6 +45,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
 
   useEffect(() => {
     const off = bindCheckpoints()
+    const offSync = bindSync()
     if (session.isHost) reachCheckpoint(def.startCp, true)
     else {
       // The guest starts at the same checkpoint and is corrected by the host's vars.
@@ -49,7 +53,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
     }
     setMusic(def.music)
     const unsub = useHud.subscribe((s) => setPaused(s.paused))
-    return () => { off(); unsub() }
+    return () => { off(); offSync(); unsub() }
   }, [def, session])
 
   const start = cps.get(def.startCp)!
@@ -81,6 +85,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
           <MergeFx />
           <Simulation />
           <HudSystem />
+          <FunSystem />
           <CameraRig />
         </Physics>
         <Particles />

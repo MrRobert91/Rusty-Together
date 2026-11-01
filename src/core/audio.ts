@@ -157,10 +157,66 @@ export type Sfx =
   | 'door' | 'lever' | 'success' | 'fall' | 'merge' | 'split' | 'alarm' | 'whoosh' | 'bonk'
   | 'pop' | 'click' | 'hover' | 'tick' | 'go' | 'fanfare' | 'net' | 'ping' | 'boost' | 'charge'
   | 'checkpoint' | 'clank' | 'servo' | 'fuse' | 'denied' | 'emote'
+  | 'clap' | 'coin' | 'boing' | 'goal' | 'combo' | 'kick' | 'yay'
 
-export function sfx(name: Sfx, pos?: V3, vol = 1) {
+/** `pitch` (1 = normal) lets combos climb a scale. */
+export function sfx(name: Sfx, pos?: V3, vol = 1, pitch = 1) {
   if (!ctx) return
+  const P = pitch
   switch (name) {
+    case 'clap': {
+      // High five: two bright noise slaps and a sparkly chime.
+      const o = out(pos, 0.9 * vol, 40, 0.3); if (!o) return
+      noise(o, 0.07, 1, 'bandpass', 2400, 1800, 1.4)
+      noise(o, 0.05, 0.6, 'highpass', 5000, 5000, 1, 0.012)
+      osc(o, 'sine', 180, 90, 0.08, 0.5)
+      ;[1046, 1318, 1568, 2093].forEach((f, i) => osc(o, 'triangle', f, f, 0.35, 0.18, 0.003, 0.06 + i * 0.045))
+      break
+    }
+    case 'coin': {
+      const o = out(pos, 0.55 * vol, 40, 0.25); if (!o) return
+      osc(o, 'square', 988 * P, 988 * P, 0.08, 0.18)
+      osc(o, 'square', 1318 * P, 1318 * P, 0.35, 0.18, 0.003, 0.07)
+      osc(o, 'sine', 2636 * P, 2636 * P, 0.3, 0.12, 0.003, 0.07)
+      break
+    }
+    case 'boing': {
+      const o = out(pos, 0.6 * vol, 40, 0.2); if (!o) return
+      const os = osc(o, 'sine', 140 * P, 520 * P, 0.32, 0.7, 0.004)
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 22
+      const lg = ctx.createGain(); lg.gain.value = 60 * P
+      lfo.connect(lg).connect(os.frequency); lfo.start(o.t); lfo.stop(o.t + 0.36)
+      osc(o, 'triangle', 280 * P, 900 * P, 0.18, 0.2, 0.004)
+      break
+    }
+    case 'goal': {
+      const o = out(pos, 0.9 * vol, 0, 0.5); if (!o) return
+      noise(o, 1.4, 0.35, 'bandpass', 900, 2400, 0.6) // crowd-ish roar
+      ;[523, 659, 784, 1046, 784, 1046].forEach((f, i) => osc(o, 'square', f, f, 0.16, 0.14, 0.004, i * 0.09))
+      osc(o, 'sine', 1046, 1046, 0.8, 0.3, 0.004, 0.55)
+      osc(o, 'sine', 1568, 1568, 0.8, 0.2, 0.004, 0.55)
+      break
+    }
+    case 'combo': {
+      // Short rising arpeggio; `pitch` climbs with the multiplier.
+      const o = out(undefined, 0.32 * vol, 0, 0.2); if (!o) return
+      ;[1, 1.26, 1.5].forEach((k, i) => osc(o, 'triangle', 660 * P * k, 660 * P * k, 0.14, 0.4, 0.003, i * 0.045))
+      break
+    }
+    case 'kick': {
+      const o = out(pos, 0.6 * vol); if (!o) return
+      osc(o, 'sine', 160, 60, 0.14, 0.9)
+      noise(o, 0.05, 0.5, 'lowpass', 1800, 500)
+      break
+    }
+    case 'yay': {
+      // Tiny robot cheer: two quick chirps up.
+      const o = out(pos, 0.5 * vol, 30, 0.2); if (!o) return
+      osc(o, 'square', 700 * P, 1400 * P, 0.1, 0.12)
+      osc(o, 'square', 900 * P, 1800 * P, 0.14, 0.12, 0.004, 0.12)
+      osc(o, 'sine', 1800 * P, 2400 * P, 0.2, 0.2, 0.004, 0.12)
+      break
+    }
     case 'jump': {
       const o = out(pos, 0.5 * vol); if (!o) return
       osc(o, 'sine', rnd(300, 340), 720, 0.16, 0.6)

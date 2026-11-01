@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { spark } from '../../fun/sync'
 import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
@@ -124,6 +125,7 @@ export function CrabRoom() {
       if (p === 'warnW' || p === 'warnE' || p === 'idle') {
         // Parried: the claw drops and the crab resets its cycle.
         brain.go('idle')
+        spark('parry', anchors.face.pos)
         G.stats.parries = (G.stats.parries ?? 0) + 1
         if (G.stats.parries === 1) say.toast('¡Golpe al visor! El cangrejo pierde el ritmo y cancela el barrido.', 'good')
       }
@@ -180,6 +182,7 @@ export function CrabRoom() {
           a.enabled = false
           if (side === 'W') s.beltW = 0; else s.beltE = 0
           fx('sfx', { n: 'clank', p: a.pos })
+          spark('crab', a.pos)
           say.toast(`¡Pestillo ${side === 'W' ? 'oeste' : 'este'} en la cinta!`, side === 'W' ? 'cyan' : 'amber')
         }
         a.pos.set(x, FLOOR + 1.3, L.z)
@@ -244,8 +247,11 @@ export function CrabRoom() {
           if (s.pryA < 0) s.pryA = who
           const before = s.pry
           s.pry = Math.min(2, s.pry + dt * 0.5)
+          // Snap the halfway mark: the meter rounds to «full» a frame early.
+          if (before < 1 && s.pry > 0.985) s.pry = Math.max(s.pry, 1)
           if (Math.floor(s.pry * 8) !== Math.floor(before * 8)) fx('sfx', { n: 'servo', p: CRAB_HOME })
           if (before < 1 && s.pry >= 1) {
+            spark('crab', B.pos)
             fx('sfx', { n: 'clank', p: CRAB_HOME })
             fx('shake', { a: 0.3 })
             say.toast('¡Medio abierto! Ahora intercambiad: el otro ancla y el que anclaba tira.', 'good')
@@ -285,6 +291,7 @@ export function CrabRoom() {
           brain.go('down')
           fx('sfx', { n: 'fuse', p: SOCKET })
           fx('shake', { a: 0.6 })
+          spark('fuse', SOCKET)
           say.banner('¡FUSIBLE RECUPERADO!', 'El ascensor al jardín vuelve a tener energía', '#5dff8a')
           say.mood('victory')
           G.medals.add('crab')

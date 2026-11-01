@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { spark } from '../../fun/sync'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { G, fx, isHost, localMini, onAct, onFx } from '../../runtime'
@@ -60,6 +61,7 @@ export function Arena() {
     const b = BELLS.find((x) => x[0] === id)!
     fx('sfx', { n: 'bell', p: new THREE.Vector3(b[1][0], b[1][1] + 2.2, b[1][2]) })
     fx('particles', { n: 'ring', p: { x: b[1][0], y: b[1][1] + 2.2, z: b[1][2] }, c: SLOT_COLOR[slot as 0 | 1] })
+    spark('bell', new THREE.Vector3(b[1][0], b[1][1] + 2.2, b[1][2]))
     s.relight.push({ at: G.time + 1.3, owner: slot as 0 | 1 })
   }
 

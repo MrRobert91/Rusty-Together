@@ -19,6 +19,7 @@ import { setPushToTalk, toggleMute } from '../net/voice'
 import { sfx, stinger } from '../core/audio'
 import { useHud, toast } from './hud'
 import { lineOfSight } from './robots/physicsUtil'
+import { spark } from './fun/sync'
 
 export { plates, type Plate } from './runtime'
 
@@ -95,7 +96,7 @@ export function Simulation() {
     offs.push(onAct('grab', (slot, d) => {
       const nb = G.bodies.get(d.id)
       if (!nb) return
-      if (nb.heldBy >= 0 && nb.heldBy !== slot) { if (slot !== localSlot()) s.send('deny', { id: d.id }); else localMini().carrying = null; return }
+      if (nb.heldBy >= 0 && nb.heldBy !== slot) { if (G.minis[slot].kind === 'remote') s.send('deny', { id: d.id }); else G.minis[slot].carrying = null; return }
       nb.heldBy = slot
       nb.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true)
       setCarriedCollision(nb.body, true)
@@ -361,6 +362,7 @@ function finishMerge() {
   B.landT = G.time
   B.landImpact = 1
   hostSet('form', 'joined')
+  spark('merge', B.pos)
 }
 
 function startSplit(spots: THREE.Vector3[]) {

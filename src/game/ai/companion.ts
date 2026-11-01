@@ -43,6 +43,7 @@ class Brain {
   stuckT = 0
   lastPos = new THREE.Vector3()
   force = new YV3()
+  fiveSeen = -9
 
   constructor() {
     this.vehicle.maxSpeed = 4.6
@@ -259,6 +260,16 @@ export function companionMini(inp: StepInput, dt: number) {
   b.stuckT = inp.move.lengthSq() > 0.1 && moved < 0.01 ? b.stuckT + dt : 0
   b.lastPos.copy(b.me.pos)
   b.fsm.update()
+  // You raise a hand near the bot: it raises its own (they clap automatically).
+  const you = b.you
+  if (b.mode.k !== 'sleep' && you.emote === 1 && b.t - b.fiveSeen > 1 && G.time - you.emoteT < 0.3 && b.me.pos.distanceTo(you.pos) < 5 && b.me.hangOn < 0 && you.hangOn < 0) {
+    b.fiveSeen = b.t
+    offerFive()
+  }
+  // Walk over to clap when both hands are up.
+  if (b.me.emote === 1 && you.emote === 1 && G.time - b.me.emoteT < 2.6 && G.time - you.emoteT < 2.6 && b.me.grounded) {
+    if (b.me.pos.distanceTo(you.pos) > 1.6) b.steer(you.pos, 1.4)
+  }
 }
 
 /** In the joined body the bot mirrors your leg and can sync jumps / arms. */
@@ -280,6 +291,16 @@ export function companionPilot(rp: PilotFrame, lp: PilotFrame) {
     fx('sfx', { n: 'beepAmber', p: G.big.pos, v: 0.5 })
     return false
   })
+}
+
+/** Ámbar-bot holds a hand up, waiting for your palm (see fun/highfive). */
+export function offerFive() {
+  const me = G.minis[1]
+  const you = G.minis[0]
+  me.yaw = Math.atan2(you.pos.x - me.pos.x, you.pos.z - me.pos.z)
+  me.emote = 1
+  me.emoteT = G.time
+  fx('sfx', { n: 'beepAmber', p: me.pos })
 }
 
 export function resetBrain() {

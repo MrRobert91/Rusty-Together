@@ -4,6 +4,7 @@ import { hostSet, onVar } from '../net/replication'
 import { fx } from '../runtime'
 import { sfx } from '../../core/audio'
 import { toast } from '../hud'
+import { spark } from '../fun/sync'
 
 type V3 = [number, number, number]
 
@@ -27,7 +28,13 @@ export function reachCheckpoint(id: string, quiet = false) {
   const cur = G.checkpoint ? cps.get(G.checkpoint.id) : null
   if (!next || (cur && cur.order >= next.order)) return
   hostSet('cp', id)
-  if (!quiet) fx('checkpoint', {})
+  if (!quiet) {
+    fx('checkpoint', {})
+    // Where the team is now: the joined body, or the middle of both minis.
+    const [a, b] = G.minis
+    const p = G.big.active ? G.big.pos : a.hidden ? b.pos : b.hidden ? a.pos : a.pos.clone().add(b.pos).multiplyScalar(0.5)
+    spark('cp', p)
+  }
 }
 
 export function bindCheckpoints() {

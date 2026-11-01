@@ -10,6 +10,8 @@ import { useApp } from './appStore'
 import { backToMenu, startSolo } from './App'
 import { lobbySend, useLobby } from '../net/online'
 import { useSettings } from '../core/settings'
+import { Popups, SpeedLines, SyncMeter } from './FunHud'
+import { rankFor } from '../game/fun/sync'
 
 export function useDevice() {
   const [d, setD] = useState<Device>(currentDevice())
@@ -36,6 +38,9 @@ export function Hud() {
 
   return (
     <div className={`hud ${h.letterbox ? 'letterbox' : ''}`}>
+      <SpeedLines />
+      <Popups />
+      <SyncMeter />
       {/* Portraits */}
       <div className="portraits">
         {[me, other].map((slot, i) => (
@@ -267,6 +272,14 @@ const MEDAL_INFO: Record<string, [string, string]> = {
   tutorial: ['🎓', 'Taller de pruebas completado'],
 }
 
+const RANK_COLOR = { S: 'linear-gradient(135deg, #ffe14d, #ff7ad9)', A: '#8dff9a', B: '#8ff6ff', C: '#d8c9ab' } as const
+const RANK_NOTE = {
+  S: '¡Sincronía total! Sois una sola mente con dos cabezas.',
+  A: '¡Gran equipo! Un par de choques de manos más y llegáis a la S.',
+  B: 'Buen trabajo. Encadenad trampolines y saltos conjuntos para subir el multiplicador.',
+  C: 'Funcionáis… más o menos. ¡Repetid y encadenad combos!',
+} as const
+
 function LevelDone() {
   const d = useHud((s) => s.levelDone)!
   const session = useApp((s) => s.session)
@@ -274,12 +287,21 @@ function LevelDone() {
   const isTutorial = G.level === 'tutorial'
   const mins = Math.floor(d.time / 60)
   const secs = Math.floor(d.time % 60)
+  const rank = rankFor(G.level, d.score ?? 0)
   return (
     <div className="level-done">
       <div className="ld-card">
         <div className="ld-kicker">{isTutorial ? 'Tutorial completado' : 'Nivel 1 · Muelles de rebote'}</div>
         <div className="ld-title">{isTutorial ? '¡Listos para la fábrica!' : '¡Fusible recuperado!'}</div>
-        <div className="ld-time">{mins}:{String(secs).padStart(2, '0')}</div>
+        <div className="ld-sync">
+          <div className="ld-rank" style={{ ['--rk' as any]: RANK_COLOR[rank] }}>{rank}</div>
+          <div className="ld-sync-meta">
+            <div className="k">Sincronía</div>
+            <div className="v">{(d.score ?? 0).toLocaleString('es-ES')}</div>
+            <div className="s">Mejor cadena ×{Math.min(5, d.best ?? 1)} · {d.sparks ?? 0} chispas · {mins}:{String(secs).padStart(2, '0')}</div>
+          </div>
+        </div>
+        <div className="ld-rank-note">{RANK_NOTE[rank]}</div>
         <div className="ld-stats">
           {Object.entries(d.stats).map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}
         </div>

@@ -34,7 +34,7 @@ export interface HudState {
   banner: { title: string; sub?: string; color?: string } | null
   subtitle: { who: string; text: string; color: string } | null
   stickers: string[]
-  levelDone: null | { time: number; medals: string[]; stats: Record<string, string | number> }
+  levelDone: null | { time: number; medals: string[]; stats: Record<string, string | number>; score?: number; best?: number; sparks?: number }
   hint: string | null
   paused: boolean
   set: (p: Partial<HudState>) => void

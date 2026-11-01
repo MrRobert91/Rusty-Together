@@ -20,7 +20,7 @@ export function Atmosphere() {
   const high = useMemo(() => tier() === 'high', [])
 
   useMemo(() => {
-    scene.fog = new THREE.Fog('#c4e2fa', 110, 560)
+    scene.fog = new THREE.Fog('#d6e6f6', 110, 560)
     scene.background = new THREE.Color('#8cc6f2')
   }, [scene])
 
@@ -36,11 +36,11 @@ export function Atmosphere() {
   return (
     <>
       <SkyDome />
-      <hemisphereLight args={['#d6ecff', '#c27f55', 0.85]} />
+      <hemisphereLight args={['#d9ecff', '#d08a5e', 0.85]} />
       <directionalLight
         ref={light}
-        color="#fff0d6"
-        intensity={2.6}
+        color="#ffe9c9"
+        intensity={2.75}
         castShadow={t !== 'low'}
         shadow-mapSize={high ? [2048, 2048] : [1024, 1024]}
         shadow-camera-left={-28}
@@ -82,7 +82,7 @@ function CloudSea({ count }: { count: number }) {
       }
     })
   }, [])
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ map: puffTex(), transparent: true, depthWrite: false, color: '#ffffff', fog: true, opacity: 0.92 }), [])
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ map: puffTex(), transparent: true, depthWrite: false, color: '#fff7ee', fog: true, opacity: 0.92 }), [])
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const camera = useThree((s) => s.camera)
   useFrame((_, dt) => {
@@ -180,12 +180,12 @@ function SkyDome() {
     depthWrite: false,
     fog: false,
     uniforms: {
-      zenith: { value: new THREE.Color('#2f86e0') },
+      zenith: { value: new THREE.Color('#2a78dc') },
       mid: { value: new THREE.Color('#79bdf3') },
-      horizon: { value: new THREE.Color('#dff1ff') },
+      horizon: { value: new THREE.Color('#fff1df') },
       below: { value: new THREE.Color('#b9daf2') },
       sunDir: { value: SUN.clone().normalize() },
-      sunCol: { value: new THREE.Color('#fff2d2') },
+      sunCol: { value: new THREE.Color('#ffe7bd') },
     },
     vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }`,
     fragmentShader: `uniform vec3 zenith, mid, horizon, below, sunDir, sunCol; varying vec3 vDir;
@@ -194,7 +194,9 @@ function SkyDome() {
         vec3 c = h > 0.0 ? mix(horizon, mid, smoothstep(0.0, 0.22, h)) : mix(horizon, below, smoothstep(0.0, -0.3, h));
         c = h > 0.22 ? mix(mid, zenith, smoothstep(0.22, 0.85, h)) : c;
         float s = max(dot(normalize(vDir), sunDir), 0.0);
-        c += sunCol * (pow(s, 600.0) * 3.0 + pow(s, 12.0) * 0.25);
+        c += sunCol * (pow(s, 600.0) * 3.0 + pow(s, 12.0) * 0.32 + pow(s, 3.0) * 0.08);
+        // A soft warm band just above the horizon.
+        c = mix(c, vec3(1.0, 0.86, 0.72), smoothstep(0.12, 0.0, abs(h - 0.02)) * 0.28);
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
       }`,

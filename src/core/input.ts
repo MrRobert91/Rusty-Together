@@ -283,7 +283,7 @@ export function glyph(b: Btn, device: Device = lastDevice): string {
 /** Touch glyphs match the icons drawn on the on-screen buttons. */
 export const TOUCH_GLYPH: Record<Btn, string> = {
   jump: '⤒', grab: '✋', punch: '👊', context: '✦', signal: '!', camera: '◎',
-  pause: 'II', emote1: '👋', emote2: '👍', emote3: '❤', emote4: '😂', talk: '🎙', mute: '🔇',
+  pause: 'II', emote1: '🖐️', emote2: '👍', emote3: '❤', emote4: '😂', talk: '🎙', mute: '🔇',
 }
 
 /** Short verb shown next to each glyph when text names a button. */

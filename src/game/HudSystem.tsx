@@ -12,6 +12,7 @@ import { human } from './control'
 import { sfx } from '../core/audio'
 import { settings } from '../core/settings'
 import { GEO, M } from './robots/materials'
+import { FIVE_WINDOW } from './fun/highfive'
 
 const aim = new THREE.Vector3()
 const tmp = new THREE.Vector3()
@@ -37,7 +38,7 @@ export function HudSystem() {
 
   useEffect(() => {
     const offs = [
-      onFx('sfx', (e) => sfx(e.n, e.p, e.v ?? 1)),
+      onFx('sfx', (e) => sfx(e.n, e.p, e.v ?? 1, e.pt ?? 1)),
       onFx('hint', (e) => toast(e.text, 'warn', 2600)),
       onFx('joint', () => { if (!settings().reduceFlashes) G.cam.shake = Math.min(1, G.cam.shake + 0.2) }),
       onFx('boost', (e) => {
@@ -103,9 +104,12 @@ export function HudSystem() {
           if (pp.kind === 'anchor' && pp.anchor) {
             mark('punch', pp.anchor.pos)
             const k = pp.anchor.kind
-            prompt({ id: 'punch', btn: 'punch', text: k === 'bell' ? 'Golpear campana' : k === 'button' ? 'Pulsar el botón' : '¡Pégale!' })
+            prompt({ id: 'punch', btn: 'punch', text: k === 'bell' ? 'Golpear campana' : k === 'button' ? 'Pulsar el botón' : k === 'ball' ? '¡Chuta la pelota!' : '¡Pégale!' })
           } else if (pp.kind === 'robot' && G.vars.arenaLive) {
             prompt({ id: 'punch', btn: 'punch', text: `Empujar a ${pn}` })
+          } else if (pp.kind === 'robot' && partner.emote === 1 && now - partner.emoteT < FIVE_WINDOW) {
+            mark('punch', tmp.copy(partner.pos).setY(partner.pos.y + 1.0))
+            prompt({ id: 'five', btn: 'punch', text: '¡Choca esos cinco!' })
           }
         }
         // Grab targets: offered hand, box, or the partner's body.

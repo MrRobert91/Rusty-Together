@@ -14,7 +14,7 @@ import { fx } from '../runtime'
 import { useVoice } from '../../net/voice'
 import { GEO, M } from './materials'
 
-const EMOTE_ICON = ['', '👋', '🎉', '👉', '❓']
+const EMOTE_ICON = ['', '🖐️', '🎉', '👉', '❓']
 
 export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vector3; yaw: number }) {
   const wallHands = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], [])
@@ -100,7 +100,7 @@ export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vecto
     // Emote bubble + name tag.
     if (bubble.current) {
       const et = G.time - mini.emoteT
-      const show = mini.emote > 0 && et < 1.8
+      const show = mini.emote > 0 && et < (mini.emote === 1 ? 2.6 : 1.8)
       bubble.current.style.opacity = show ? '1' : '0'
       bubble.current.style.transform = `translate(-50%, -100%) scale(${show ? 1 + Math.max(0, 0.3 - et) : 0.6})`
       if (show) bubble.current.textContent = EMOTE_ICON[mini.emote]

@@ -6,13 +6,15 @@ import { defineCheckpoints, reachCheckpoint } from './checkpoints'
 import { PresentationBridge, say, useHostLogic, useJoinedSafeZones } from './common'
 import { G, fx, localMini } from '../runtime'
 import { aiDriver } from '../Simulation'
-import { brain, companionMini, companionPilot, resetBrain } from '../ai/companion'
+import { brain, companionMini, companionPilot, offerFive, resetBrain } from '../ai/companion'
 import { hostSet } from '../net/replication'
 import { useHud } from '../hud'
 import { BIG, MINI } from '../tuning'
 import { sfx, setMusic } from '../../core/audio'
 import { Finish } from './Finish'
 import { backdropCfg } from '../env/Atmosphere'
+import { GoldenNut } from '../env/props2'
+import { BeachBall, Bunting, Goal, GoalBoard, Mushroom, Pole } from '../env/toys'
 
 /*
  * Taller de pruebas — solo tutorial with Ámbar-bot.
@@ -45,6 +47,9 @@ export function setupTutorial() {
   aiDriver.pilot = (rp, lp) => companionPilot(rp, lp)
 }
 
+const AWAKE = ['hand', 'cross', 'catch', 'couple', 'walk', 'hop', 'joint', 'sling', 'split', 'done']
+const FIVE_AFTER = ['couple', 'done']
+
 type Step = 'move' | 'jump' | 'high' | 'box' | 'punch' | 'swing' | 'spring' | 'meet' | 'boost' | 'hand' | 'cross' | 'catch' | 'couple' | 'walk' | 'hop' | 'joint' | 'sling' | 'split' | 'done'
 
 const OBJ: Record<Step, string> = {
@@ -70,7 +75,7 @@ const OBJ: Record<Step, string> = {
 }
 
 export function Tutorial() {
-  const st = useRef({ step: 'move' as Step, t: 0, t2: 0, said: new Set<string>() })
+  const st = useRef({ step: 'move' as Step, t: 0, t2: 0, tt: 0, fiveAt: 0, said: new Set<string>() })
 
   useEffect(() => {
     setMusic('explore')
@@ -96,6 +101,16 @@ export function Tutorial() {
       s.t = 0
       say.objective(OBJ[n])
       hostSet('tstep', n)
+      // Once awake, Ámbar-bot celebrates every step you clear.
+      if (AWAKE.includes(n) && bot.kind === 'ai' && !bot.hidden && !(bot.emote === 1 && G.time - bot.emoteT < 2.6)) { bot.emote = 2; bot.emoteT = G.time; fx('sfx', { n: 'yay', p: bot.pos, v: 0.6 }) }
+      if (FIVE_AFTER.includes(n)) s.fiveAt = s.tt + 1.4
+    }
+    s.tt += dt
+    // Offer a high five a moment after the big cooperative beats.
+    if (s.fiveAt > 0 && s.tt > s.fiveAt && G.form === 'split' && !bot.hidden) {
+      s.fiveAt = 0
+      offerFive()
+      say.sub('Ámbar-bot', '¡Bip! (¡Choca esos cinco! {punch})', '#ffd27a')
     }
     const once = (k: string, f: () => void) => { if (!s.said.has(k)) { s.said.add(k); f() } }
 
@@ -285,6 +300,29 @@ export function Tutorial() {
       <Finish pos={[0, 7.4, -131]} active={() => G.vars.tstep === 'done'} onDone={() => G.medals.add('tutorial')} label="¡Taller superado!" />
       <Tree pos={[-4.5, 7.4, -132]} s={1.2} />
       <Tree pos={[4.8, 7.4, -126]} s={0.9} />
+
+      {/* ---- Playground: beach ball + goal, bouncy mushrooms, golden nuts, bunting ---- */}
+      <BeachBall id="t" pos={[1.8, 1, -8]} />
+      <Goal id="t" ball="t" pos={[-4.0, 0, -9]} rotY={Math.PI / 2} />
+      <GoalBoard id="t" pos={[-5.3, 0, -12.2]} rotY={0.6} />
+      <Mushroom pos={[4.2, 0, -10.8]} color={0} />
+      <GoldenNut id="tn1" pos={[4.2, 5, -10.8]} />
+      <Sign pos={[2.4, 2, -12.6]} rotY={-0.3} text="¡Boing!" sub="salta en la seta" small />
+      <GoldenNut id="tn2" pos={[2.4, 1.7, -15.2]} />
+      <GoldenNut id="tn3" pos={[0, 2.5, -43.6]} />
+      <Mushroom pos={[-4.2, 5, -58.5]} color={2} />
+      <Mushroom pos={[-4.2, 5, -63.5]} color={3} />
+      <GoldenNut id="tn4" pos={[-4.2, 10, -63.5]} />
+      <Mushroom pos={[4.4, 7.4, -125.2]} color={1} />
+      <GoldenNut id="tn5" pos={[4.4, 12.4, -125.2]} />
+      <Pole pos={[-5.6, 0, 0.6]} />
+      <Pole pos={[5.6, 0, 0.6]} color="#22c7d6" />
+      <Bunting a={[-5.6, 4.3, 0.6]} b={[5.6, 4.3, 0.6]} />
+      <Pole pos={[-5.6, 7.4, -122.6]} color="#ffd23a" />
+      <Pole pos={[5.6, 7.4, -122.6]} color="#ff7ad9" />
+      <Bunting a={[-5.6, 11.7, -122.6]} b={[5.6, 11.7, -122.6]} />
+      <Bunting a={[-5.6, 11.7, -122.6]} b={[-3.2, 10.8, -131]} sag={0.5} />
+      <Bunting a={[5.6, 11.7, -122.6]} b={[3.2, 10.8, -131]} sag={0.5} />
     </>
   )
 }
