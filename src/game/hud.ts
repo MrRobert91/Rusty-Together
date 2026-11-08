@@ -16,7 +16,18 @@ export interface Toast {
   t: number
 }
 
+/** The single on-screen text channel: objectives, hints, signs and chatter. */
+export interface Info {
+  key: string
+  text: string
+  tone: 'obj' | 'sign' | 'info' | 'good' | 'warn' | 'cyan' | 'amber' | 'talk'
+  who?: string
+  color?: string
+}
+
 export interface HudState {
+  info: Info | null
+  infoOpen: boolean
   roomTitle: { n: string; title: string; mode: string } | null
   objective: string
   prompts: Prompt[]
@@ -41,6 +52,8 @@ export interface HudState {
 }
 
 export const useHud = create<HudState>((set) => ({
+  info: null,
+  infoOpen: false,
   roomTitle: null,
   objective: '',
   prompts: [],
@@ -63,8 +76,32 @@ export const useHud = create<HudState>((set) => ({
   set: (p) => set(p),
 }))
 
+/** How long a message stays open before it folds back into the ⓘ button. */
+export const INFO_MS = 4000
+let infoTimer = 0
+/**
+ * Show a message in the info bubble (top right). It closes by itself after
+ * INFO_MS and only the ⓘ button stays; showing the same key again while it is
+ * open just keeps it open (a sign you keep reading).
+ */
+let infoShownAt = 0
+export function showInfo(text: string, tone: Info['tone'] = 'info', opts: { key?: string; who?: string; color?: string; ms?: number; weak?: boolean } = {}) {
+  if (!text) return
+  const key = opts.key ?? `${tone}:${text}`
+  const st = useHud.getState()
+  const same = st.infoOpen && st.info?.key === key
+  // A weak message (a sign you walk past) never covers a fresh objective or alert.
+  if (opts.weak && !same && st.infoOpen && st.info?.tone !== 'sign' && performance.now() - infoShownAt < INFO_MS) return
+  if (!same) { infoShownAt = performance.now(); useHud.setState({ info: { key, text, tone, who: opts.who, color: opts.color }, infoOpen: true }) }
+  window.clearTimeout(infoTimer)
+  infoTimer = window.setTimeout(() => useHud.setState({ infoOpen: false }), opts.ms ?? INFO_MS)
+}
+export function hideInfo() { window.clearTimeout(infoTimer); useHud.setState({ infoOpen: false }) }
+
 let toastId = 1
 export function toast(text: string, tone: Toast['tone'] = 'info', ms = 3200) {
+  // In game, every text message goes through the auto-hiding info bubble.
+  showInfo(text, tone)
   const t: Toast = { id: toastId++, text, tone, t: performance.now() }
   useHud.setState((s) => ({ toasts: [...s.toasts.slice(-3), t] }))
   window.setTimeout(() => useHud.setState((s) => ({ toasts: s.toasts.filter((x) => x.id !== t.id) })), ms)
@@ -79,6 +116,7 @@ export function banner(title: string, sub?: string, color?: string, ms = 2600) {
 
 let subTimer = 0
 export function subtitle(who: string, text: string, color: string, ms = 3200) {
+  showInfo(text, 'talk', { who, color })
   window.clearTimeout(subTimer)
   useHud.setState({ subtitle: { who, text, color } })
   subTimer = window.setTimeout(() => useHud.setState({ subtitle: null }), ms)

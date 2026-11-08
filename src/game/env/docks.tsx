@@ -122,7 +122,8 @@ export function HazardEdge({ pos, len, rotY = 0 }: { pos: V3; len: number; rotY?
   }, [len])
   return (
     <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
-      <mesh material={mat} position-y={-0.2} castShadow>
+      {/* Top stands 4 cm proud of the floor/grass: never coplanar with it. */}
+      <mesh material={mat} position-y={-0.17} castShadow>
         <boxGeometry args={[len, 0.42, 0.14]} />
       </mesh>
     </group>

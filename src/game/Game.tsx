@@ -35,7 +35,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
     resetSimulationState()
     resetSync()
     def.setup()
-    useHud.setState({ form: 'split', prompts: [], arena: null, levelDone: null, banner: null, roomTitle: null, objective: '', paused: false, stickers: useHud.getState().stickers })
+    useHud.setState({ form: 'split', prompts: [], arena: null, levelDone: null, banner: null, roomTitle: null, objective: '', info: null, infoOpen: false, paused: false, stickers: useHud.getState().stickers })
     return true
   }, [level, session, def])
   const [paused, setPaused] = useState(false)
@@ -67,7 +67,7 @@ export function Game({ level, session }: { level: string; session: Session }) {
       shadows={initialTier !== 'low'}
       dpr={tierNow === 'high' ? [1, 1.75] : tierNow === 'medium' ? [1, 1.4] : [0.75, 1.15]}
       gl={{ antialias: initialTier === 'low', powerPreference: 'high-performance', stencil: false }}
-      camera={{ fov: 55, near: 0.1, far: 700, position: [0, 5, 10] }}
+      camera={{ fov: 55, near: 0.25, far: 700, position: [0, 5, 10] }}
       onCreated={({ gl, scene }) => {
         if (import.meta.env.DEV) { (window as any).__scene = scene; (window as any).__gl = gl }
         gl.toneMapping = THREE.NoToneMapping

@@ -8,7 +8,7 @@ import {
   G, act, camRelative, clamp, fx, isHost, localMini, localSlot, onAct, onPlate, peerMini, peerSlot, plates, type Mini, type Plate,
 } from './runtime'
 import { consumeHuman, newStepInput, pollHuman, clearEdges, human, type StepInput } from './control'
-import { applyHit, carryPoint, respawnMini, stepMini } from './robots/miniController'
+import { applyHit, carryPoint, respawnMini, setMiniVel, stepMini } from './robots/miniController'
 import { bigWantsSplit, newPilotFrame, resetBigLocals, stepBig, type PilotFrame } from './robots/bigController'
 import {
   clearBigBuffer, clearBuffers, encodeMini, encodeWorld, hostSet, onVar, receiveMiniPose, receiveWorld, sampleBig,
@@ -51,7 +51,8 @@ function aimFromCamera(out: THREE.Vector3) {
 
 function pilotAim(out: THREE.Vector3) {
   const a = G.cam.yaw + aimOff.yaw + Math.PI
-  const p = aimOff.pitch
+  // Looking up with the camera raises the arm (rings hang overhead).
+  const p = clamp(aimOff.pitch + (0.36 - G.cam.pitch) * 0.9, -0.3, 1.25)
   return out.set(Math.sin(a) * Math.cos(p), Math.sin(p), Math.cos(a) * Math.cos(p))
 }
 
@@ -134,19 +135,9 @@ export function Simulation() {
     const f = pollHuman(dt)
     if (f.pressed.mute) toggleMute()
     setPushToTalk(f.held.talk)
-    // Joined body: mouse / right stick aims this pilot's arm instead of the camera.
-    if (G.form === 'joined') {
-      if (f.device === 'pad') {
-        aimOff.yaw = THREE.MathUtils.damp(aimOff.yaw, -f.aim.x * 1.1, 10, dt)
-        aimOff.pitch = THREE.MathUtils.damp(aimOff.pitch, 0.35 + f.aim.y * 0.6, 10, dt)
-      } else {
-        aimOff.yaw = clamp(aimOff.yaw + f.look.x * 1.2, -1.2, 1.2)
-        aimOff.pitch = clamp(aimOff.pitch + f.look.y * 1.2, -0.3, 1.2)
-      }
-      // Joined camera is guided; don't let the look delta orbit it.
-      f.look.x = 0
-      f.look.y = 0
-    }
+    // Joined body: each player orbits their own camera freely (it is local to
+    // this client); this pilot's arm aims where their camera looks.
+    void dt
   }, -100)
 
   /* ---------------------------------------------------------------- fixed-rate */
@@ -196,6 +187,20 @@ export function Simulation() {
       clearEdges(aiIn)
     } else if (other.kind === 'remote') {
       sampleMini(other)
+      other.netPos.copy(other.pos)
+      // Dragging (or being dragged by) a remote partner: the hands keep you at
+      // arm's length, but we see them a network delay late. Show them where
+      // they are relative to us (hands on the body) instead of trailing.
+      if ((me.towing || other.towing) && !me.hidden && !other.hidden && !other.dead && !me.dead) {
+        towBlend = Math.min(1, towBlend + dt * 6)
+        tmp.set(other.pos.x - me.pos.x, 0, other.pos.z - me.pos.z)
+        const d = tmp.length()
+        if (d > 1e-3) {
+          tmp.multiplyScalar(MINI.towRest / d)
+          other.pos.x += (me.pos.x + tmp.x - other.pos.x) * towBlend
+          other.pos.z += (me.pos.z + tmp.z - other.pos.z) * towBlend
+        }
+      } else towBlend = 0
       if (other.body && !other.hidden) other.body.setNextKinematicTranslation({ x: other.pos.x, y: other.pos.y, z: other.pos.z })
     }
 
@@ -219,6 +224,7 @@ export function Simulation() {
       else { for (const p of pilots) { p.jumps.length = 0; p.xs.length = 0; p.xr.length = 0; p.ps.length = 0 } }
       hostForm(world, dt)
       hostCarry()
+      limitCrates()
       for (const fn of G.hostLogic) fn(dt)
     } else {
       sampleBodies(localSlot(), (id) => (me.carrying === id ? carryPoint(me, tmp) : null))
@@ -274,6 +280,7 @@ export function Simulation() {
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100
+let towBlend = 0
 let lastIntent = ''
 
 /* ---------------------------------------------------------------- Forms */
@@ -359,6 +366,7 @@ function finishMerge() {
   B.body?.setEnabled(true)
   B.body?.setTranslation({ x: B.pos.x, y: B.pos.y, z: B.pos.z }, true)
   B.body?.setLinvel({ x: 0, y: 3, z: 0 }, true)
+  B.vel.set(0, 3, 0)
   B.landT = G.time
   B.landImpact = 1
   hostSet('form', 'joined')
@@ -426,7 +434,7 @@ function applyForm(f: 'split' | 'merging' | 'joined' | 'splitting') {
       m.hidden = false
       respawnMini(m, new THREE.Vector3(sp[0], sp[1] + MINI.feet + 0.3, sp[2]), G.formYaw)
       const dir = new THREE.Vector3(sp[0] - G.formAt.x, 0, sp[2] - G.formAt.z).normalize()
-      m.body?.setLinvel({ x: dir.x * 3, y: 7, z: dir.z * 3 }, true)
+      setMiniVel(m, dir.x * 3, 7, dir.z * 3)
       m.protectT = 1
     }
     fx('particles', { n: 'merge', p: { x: G.formAt.x, y: G.formAt.y + 1.2, z: G.formAt.z } }, false)
@@ -451,6 +459,24 @@ function hostCarry() {
     carryPoint(m, tmp)
     nb.body.setNextKinematicTranslation({ x: tmp.x, y: tmp.y, z: tmp.z })
     nb.body.setNextKinematicRotation({ x: 0, y: Math.sin(m.yaw / 2), z: 0, w: Math.cos(m.yaw / 2) })
+  }
+}
+
+/**
+ * Loose crates stay playful but never rocket: a robot walking into one, or a
+ * crate squeezed between bodies, can't pop it metres into the air. Throws
+ * (4.5 m/s up) are well inside the limits.
+ */
+function limitCrates() {
+  for (const nb of G.bodies.values()) {
+    if (nb.heldBy >= 0 || !nb.id.startsWith('box') || !nb.body.isDynamic()) continue
+    const v = nb.body.linvel()
+    const h = Math.hypot(v.x, v.z)
+    const k = h > 14 ? 14 / h : 1
+    if (v.y > 5.5 || k < 1) nb.body.setLinvel({ x: v.x * k, y: Math.min(v.y, 5.5), z: v.z * k }, true)
+    const w = nb.body.angvel()
+    const wl = Math.hypot(w.x, w.y, w.z)
+    if (wl > 10) nb.body.setAngvel({ x: (w.x * 10) / wl, y: (w.y * 10) / wl, z: (w.z * 10) / wl }, true)
   }
 }
 

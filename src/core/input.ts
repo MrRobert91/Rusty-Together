@@ -28,7 +28,7 @@ export interface InputFrame {
   move: { x: number; y: number }
   /** Camera look delta for this frame, in radians. */
   look: { x: number; y: number }
-  /** Right stick raw (used for arm aim offsets in the joined body). */
+  /** Right stick raw (the camera uses `look`; kept for scripted aim). */
   aim: { x: number; y: number }
   held: Record<Btn, boolean>
   pressed: Record<Btn, boolean>

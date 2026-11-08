@@ -76,6 +76,8 @@ export class Mini {
   body: RapierRigidBody | null = null
   pos = new Vector3()
   vel = new Vector3()
+  /** Remote replica only: the interpolated network position (before any local prediction). */
+  netPos = new Vector3()
   yaw = 0
   grounded = true
   offering = false

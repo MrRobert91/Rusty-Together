@@ -101,7 +101,7 @@ class CrabBrain {
 export function CrabRoom() {
   useLevelDoneListener()
   const brain = useMemo(() => new CrabBrain(), [])
-  const st = useRef({ started: false, latchW: LATCH.W.start as number, latchE: LATCH.E.start as number, beltW: -1, beltE: -1, pryA: -1, pry: 0, fuse: 'inside' as 'inside' | 'carried' | 'dropped' | 'inserted', lastHit: new Map<string, number>(), winT: -1, objective: '' })
+  const st = useRef({ started: false, latchW: LATCH.W.start as number, latchE: LATCH.E.start as number, beltW: -1, beltE: -1, pryA: -1, pry: 0, oneHand: 0, fuse: 'inside' as 'inside' | 'carried' | 'dropped' | 'inserted', lastHit: new Map<string, number>(), winT: -1, objective: '' })
 
   // Anchors: latch rings, front handles, fuse handles.
   const anchors = useMemo(() => ({
@@ -204,7 +204,7 @@ export function CrabRoom() {
       hostSet('crabOpen', 1)
       reachCheckpoint('c6b')
       say.banner('¡Frontal abierto!', 'Uníos y agarrad las dos asas', '#ffd23a')
-      setObjective(s, 'Acoplaos en la placa y agarrad las dos asas del frontal (mantened {grab}).')
+      setObjective(s, 'Acoplaos en la placa y agarrad cada uno su asa del frontal (mantened {grab}). Luego: uno suelta su stick (⚓ ancla) y el otro lo empuja (tira).')
     }
 
     /* ---- Claw hits (phase A) ---- */
@@ -254,7 +254,7 @@ export function CrabRoom() {
             spark('crab', B.pos)
             fx('sfx', { n: 'clank', p: CRAB_HOME })
             fx('shake', { a: 0.3 })
-            say.toast('¡Medio abierto! Ahora intercambiad: el otro ancla y el que anclaba tira.', 'good')
+            say.toast('¡Medio abierto! Cambiad los papeles: el que tiraba suelta su stick (⚓) y el otro empuja el suyo.', 'good')
           }
           if (s.pry >= 2) extractFuse(s)
         }
@@ -271,38 +271,39 @@ export function CrabRoom() {
         const fp = B.pos.clone().addScaledVector(fwd, 1.15).setY(B.pos.y + 0.35)
         hostSet('fuseP', [r2(fp.x), r2(fp.y), r2(fp.z)])
         placeFuseHandles(fp, B.yaw)
-        const g0 = B.arms[0].grip, g1 = B.arms[1].grip
-        if (!B.active || B.dead || !g0 || !g1) {
+        const g0 = B.arms[0].grip?.startsWith('f'), g1 = B.arms[1].grip?.startsWith('f')
+        // One hand slipping for a moment doesn't drop it; both hands off (or the body gone) does.
+        s.oneHand = g0 && g1 ? 0 : s.oneHand + dt
+        const nearSocket = Math.hypot(B.pos.x - SOCKET.x, B.pos.z - SOCKET.z) < 3.4 && B.pos.y - BIG.feet > SOCKET.y - 0.7
+        if (B.active && !B.dead && (g0 || g1) && nearSocket) {
+          insertFuse(s)
+        } else if (!B.active || B.dead || (!g0 && !g1) || s.oneHand > 1.2) {
           s.fuse = 'dropped'
           B.carrying = null
-          const drop = B.dead && G.checkpoint?.joined ? G.checkpoint.joined.pos.clone().add(new THREE.Vector3(0, 0.6, -1.5)) : fp.setY(FLOOR + 0.5)
+          const drop = B.dead && G.checkpoint?.joined ? G.checkpoint.joined.pos.clone().add(new THREE.Vector3(0, 0.6, -1.5)) : safeFuseSpot(fp)
           hostSet('fuseP', [r2(drop.x), r2(drop.y), r2(drop.z)])
           placeFuseHandles(drop, B.yaw)
           hostSet('fuse', 'dropped')
           fx('sfx', { n: 'landHeavy', p: drop })
-          say.toast('¡Se os cayó el fusible! Agarradlo los dos ({grab}).', 'warn')
-        } else if (B.pos.distanceTo(new THREE.Vector3(SOCKET.x, SOCKET.y + BIG.feet, SOCKET.z)) < 2.2 && B.grounded) {
-          s.fuse = 'inserted'
-          B.carrying = null
-          for (const arm of B.arms) arm.grip = null
-          hostSet('fuse', 'inserted')
-          hostSet('fuseP', [SOCKET.x, SOCKET.y + 0.9, SOCKET.z])
-          anchors.fW.enabled = anchors.fE.enabled = false
-          brain.go('down')
-          fx('sfx', { n: 'fuse', p: SOCKET })
-          fx('shake', { a: 0.6 })
-          spark('fuse', SOCKET)
-          say.banner('¡FUSIBLE RECUPERADO!', 'El ascensor al jardín vuelve a tener energía', '#5dff8a')
-          say.mood('victory')
-          G.medals.add('crab')
-          if (G.stats.falls === 0) G.medals.add('noFall')
-          s.winT = G.time
+          // Landed on the dais right by the socket: it slots itself in.
+          if (Math.hypot(drop.x - SOCKET.x, drop.z - SOCKET.z) < 2.6 && drop.y > SOCKET.y - 0.2) insertFuse(s)
+          else say.toast('¡Se os cayó el fusible! Agarradlo los dos ({grab}); brilla donde está.', 'warn')
         }
       } else {
+        // Dropped: it must always be reachable. Anything odd puts it back in front of the crab.
         const fp = G.vars.fuseP as number[]
-        placeFuseHandles(new THREE.Vector3(fp[0], fp[1], fp[2]), 0)
+        const at = new THREE.Vector3(fp[0], fp[1], fp[2])
+        const safe = safeFuseSpot(at)
+        if (safe.distanceTo(at) > 0.05 || !isFinite(at.x)) {
+          hostSet('fuseP', [r2(safe.x), r2(safe.y), r2(safe.z)])
+          fx('particles', { n: 'poof', p: safe, s: 1.4 })
+          fx('sfx', { n: 'pop', p: safe })
+          at.copy(safe)
+        }
+        placeFuseHandles(at, 0)
         if (B.active && B.arms[0].grip?.startsWith('f') && B.arms[1].grip?.startsWith('f')) {
           s.fuse = 'carried'
+          s.oneHand = 0
           B.carrying = 'fuse'
           hostSet('fuse', 'carried')
           fx('sfx', { n: 'grab', p: B.pos })
@@ -330,6 +331,25 @@ export function CrabRoom() {
       for (const m of G.minis) if (!m.hidden && !m.dead) { const d = check(m.pos, MINI.feet, 0.8); if (d) hitRobot(s, `m${m.slot}`, m.slot, d) }
     }
 
+    function insertFuse(s: typeof st.current) {
+      s.fuse = 'inserted'
+      B.carrying = null
+      for (const arm of B.arms) if (arm.grip?.startsWith('f')) arm.grip = null
+      hostSet('fuse', 'inserted')
+      hostSet('crabOpen', 0)
+      hostSet('fuseP', [SOCKET.x, SOCKET.y + 0.9, SOCKET.z])
+      anchors.fW.enabled = anchors.fE.enabled = false
+      brain.go('down')
+      fx('sfx', { n: 'fuse', p: SOCKET })
+      fx('shake', { a: 0.6 })
+      spark('fuse', SOCKET)
+      say.banner('¡FUSIBLE RECUPERADO!', 'El ascensor al jardín vuelve a tener energía', '#5dff8a')
+      say.mood('victory')
+      G.medals.add('crab')
+      if (G.stats.falls === 0) G.medals.add('noFall')
+      s.winT = G.time
+    }
+
     function extractFuse(s: typeof st.current) {
       s.fuse = 'carried'
       B.carrying = 'fuse'
@@ -337,11 +357,11 @@ export function CrabRoom() {
       B.arms[1].grip = 'fE'
       anchors.fW.enabled = anchors.fE.enabled = true
       hostSet('fuse', 'carried')
-      hostSet('crabOpen', 0)
+      // The couple plate stays live until the fuse is in: split up and re-join any time.
       fx('sfx', { n: 'fuse', p: CRAB_HOME })
       fx('particles', { n: 'merge', p: { x: 0, y: 5, z: -181 } })
       say.banner('¡Fusible extraído!', 'Llevadlo a la toma: no lo soltéis', '#ffd23a')
-      setObjective(s, 'Llevad el fusible a la toma (izquierda). Saltad juntos sobre el barrido bajo.')
+      setObjective(s, 'Llevad el fusible a la toma iluminada (izquierda): subid a la tarima con un salto conjunto y se encaja solo. Saltad juntos sobre el barrido bajo.')
       reachCheckpoint('c6c')
       brain.go('retreat')
     }
@@ -380,6 +400,7 @@ export function CrabRoom() {
     if (!B.body) return
     const v = B.body.linvel()
     B.body.setLinvel({ x: v.x + dir.x * 6, y: 6, z: v.z + dir.z * 6 }, true)
+    B.vel.set(v.x + dir.x * 6, 6, v.z + dir.z * 6)
     B.stunT = 0.45
     B.launchedT = 0.4
     B.jumpT = G.time
@@ -400,12 +421,30 @@ export function CrabRoom() {
       <Fuse />
       <SweepDecals />
       <PryMeter />
+      <PryRoles />
+      <FuseBeacons />
       <CrabPrompts />
     </>
   )
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100
+
+/** Arena floor the fuse may rest on (inside the fences, clear of the crab). */
+const FUSE_AREA = { x0: -12.5, x1: 12.5, z0: -187.5, z1: -166.5 }
+const FUSE_HOME = new THREE.Vector3(0, FLOOR + 0.5, -176.5)
+function safeFuseSpot(p: THREE.Vector3) {
+  if (!isFinite(p.x) || !isFinite(p.y) || !isFinite(p.z)) return FUSE_HOME.clone()
+  const out = new THREE.Vector3(THREE.MathUtils.clamp(p.x, FUSE_AREA.x0, FUSE_AREA.x1), FLOOR + 0.5, THREE.MathUtils.clamp(p.z, FUSE_AREA.z0, FUSE_AREA.z1))
+  // On the socket dais it rests on the dais.
+  if (Math.abs(out.x - SOCKET.x) < 2.4 && Math.abs(out.z - SOCKET.z) < 2.1) out.y = SOCKET.y + 0.5
+  // Never inside the crab (wherever it stands now).
+  const c = crabPos(G.vars.crab, G.vars.crabT)
+  if (Math.abs(out.x - c.x) < 3.3 && out.z < c.z + 2.6 && out.z > c.z - 3.2) out.z = c.z + 3.2
+  if (Math.abs(p.y - out.y) > 1.5) return out
+  out.y = Math.max(out.y, Math.min(p.y, out.y + 0.2))
+  return out
+}
 
 function lowAngle(k: number) {
   // Sweeps the whole front half, right to left.
@@ -692,5 +731,140 @@ function PryMeter() {
       <mesh ref={bar} geometry={GEO.box()} material={M.basic('#ffd23a')} scale={[0.01, 0.22, 0.03]} />
       <mesh geometry={GEO.box()} material={M.basic('#ffffff', 0.6)} scale={[0.04, 0.4, 0.04]} />
     </group>
+  )
+}
+
+/* ---------------------------------------------------------------- pry roles: who anchors, who pulls */
+
+type RoleState = 'grab' | 'either' | 'anchor' | 'pull'
+const ROLE_BG = { ok: '#1f7a46', wait: '#2b3242', bad: '#8a3a16' } as const
+
+/** Badge texture: a drawn stick (centred = let go, pushed = pull) + one or two words. */
+function drawRole(g: CanvasRenderingContext2D, slot: number, role: RoleState, ok: boolean, ph: number) {
+  const W = 256, H = 150
+  g.clearRect(0, 0, W, H)
+  const col = slot === 0 ? COLORS.cyan : COLORS.amber
+  g.fillStyle = ok ? ROLE_BG.ok : role === 'grab' ? ROLE_BG.wait : ROLE_BG.bad
+  g.strokeStyle = col
+  g.lineWidth = 10
+  g.beginPath(); g.roundRect(6, 6, W - 12, H - 12, 26); g.fill(); g.stroke()
+  // Stick icon.
+  const cx = 62, cy = H / 2
+  g.fillStyle = 'rgba(0,0,0,0.35)'
+  g.beginPath(); g.arc(cx, cy, 40, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 4
+  g.beginPath(); g.arc(cx, cy, 40, 0, Math.PI * 2); g.stroke()
+  let kx = 0
+  if (role === 'pull') kx = 24 * Math.sin(ph)
+  if (role === 'either') kx = 0
+  g.fillStyle = '#ffffff'
+  g.beginPath(); g.arc(cx + kx, cy, 15, 0, Math.PI * 2); g.fill()
+  if (role === 'pull') {
+    g.strokeStyle = '#ffd23a'; g.lineWidth = 5
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(cx + sx * 26, cy - 10); g.lineTo(cx + sx * 34, cy); g.lineTo(cx + sx * 26, cy + 10); g.stroke() }
+  }
+  if (role === 'anchor') { g.font = '700 30px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚓', cx, cy - 1) }
+  if (role === 'grab') {
+    g.fillStyle = '#4f9bff'; g.beginPath(); g.arc(cx, cy, 18, 0, Math.PI * 2); g.fill()
+  }
+  g.fillStyle = '#ffffff'
+  g.textAlign = 'left'
+  g.textBaseline = 'middle'
+  g.font = '800 30px Fredoka, system-ui, sans-serif'
+  const big = role === 'grab' ? 'AGARRA' : role === 'anchor' ? 'SUELTA' : role === 'pull' ? 'EMPUJA' : 'UNO / OTRO'
+  const small = role === 'grab' ? 'tu asa' : role === 'anchor' ? 'el stick' : role === 'pull' ? 'el stick' : 'suelta · empuja'
+  g.fillText(big, 112, cy - 16)
+  g.font = '600 26px Fredoka, system-ui, sans-serif'
+  g.fillText(small, 114, cy + 20)
+  if (ok) {
+    g.fillStyle = '#5dff8a'
+    g.beginPath(); g.arc(W - 28, 26, 16, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#0d3b20'; g.lineWidth = 5
+    g.beginPath(); g.moveTo(W - 36, 26); g.lineTo(W - 30, 32); g.lineTo(W - 20, 19); g.stroke()
+  }
+}
+
+/**
+ * Phase B feedback over each handle, in each pilot's colour: whether to grab,
+ * let go of the stick (anchor ⚓) or push it (pull), and a green tick when that
+ * pilot is doing it right. Same on both clients (legs/grips are replicated).
+ */
+function PryRoles() {
+  const items = useMemo(() => [0, 1].map(() => {
+    const c = document.createElement('canvas')
+    c.width = 256; c.height = 150
+    const tex = new THREE.CanvasTexture(c)
+    tex.colorSpace = THREE.SRGBColorSpace
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false })
+    return { c, g: c.getContext('2d')!, tex, mat, key: '' }
+  }), [])
+  const refs = [useRef<THREE.Mesh>(null!), useRef<THREE.Mesh>(null!)]
+  useFrame(() => {
+    const on = G.vars.crab === 'stunned' && G.form === 'joined' && G.vars.fuse !== 'carried' && G.vars.fuse !== 'inserted'
+    const B = G.big
+    const hint = G.vars.pryHint as number | undefined
+    for (let i = 0; i < 2; i++) {
+      const mesh = refs[i].current
+      mesh.visible = on
+      if (!on) continue
+      const gripping = !!B.arms[i].grip && (B.arms[i].grip === 'hW' || B.arms[i].grip === 'hE')
+      const anchored = B.legs[i].anchored
+      const pushing = B.legs[i].push > 0.5
+      let role: RoleState = 'grab'
+      let ok = false
+      if (!gripping || hint === undefined || hint === -1) { role = 'grab'; ok = gripping }
+      else if (hint === -2) { role = anchored ? 'anchor' : pushing ? 'pull' : 'either'; ok = (anchored && B.legs[1 - i].push > 0.5) || (pushing && B.legs[1 - i].anchored) }
+      else if (hint === i) { role = 'anchor'; ok = anchored }
+      else { role = 'pull'; ok = pushing }
+      const ph = Math.floor(G.time * 4) % 4
+      const key = `${role}|${ok}|${role === 'pull' ? ph : 0}`
+      const it = items[i]
+      if (key !== it.key) { it.key = key; drawRole(it.g, i, role, ok, (ph * Math.PI) / 2); it.tex.needsUpdate = true }
+      // Over this pilot's handle (side 0 grips the west one), facing the camera.
+      const hx = B.arms[i].grip === 'hE' ? 1.05 : B.arms[i].grip === 'hW' ? -1.05 : i === 0 ? -1.05 : 1.05
+      mesh.position.set(hx * 1.6, 7.0, -180.6)
+      mesh.quaternion.copy(G.cam.pos.lengthSq() > 0 ? lookQ(mesh.position) : mesh.quaternion)
+    }
+  })
+  return (
+    <>
+      {items.map((it, i) => (
+        <mesh key={i} ref={refs[i]} material={it.mat} renderOrder={12} visible={false} scale={[1.7, 1.0, 1]}>
+          <planeGeometry />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+const _lq = new THREE.Quaternion()
+const _lm = new THREE.Matrix4()
+const _up = new THREE.Vector3(0, 1, 0)
+function lookQ(from: THREE.Vector3) {
+  _lm.lookAt(G.cam.pos, from, _up)
+  return _lq.setFromRotationMatrix(_lm)
+}
+
+/** Light beams: on the socket while the fuse is out, and on the fuse when it lies on the floor. */
+function FuseBeacons() {
+  const sock = useRef<THREE.Mesh>(null!)
+  const fuse = useRef<THREE.Mesh>(null!)
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffd23a', transparent: true, opacity: 0.22, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }), [])
+  const mat2 = useMemo(() => new THREE.MeshBasicMaterial({ color: '#5ef0ff', transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }), [])
+  useFrame(() => {
+    const st = G.vars.fuse as string | undefined
+    const out = st === 'carried' || st === 'dropped'
+    sock.current.visible = out
+    mat.opacity = 0.16 + Math.abs(Math.sin(G.time * 3)) * 0.14
+    const p = G.vars.fuseP as number[] | undefined
+    fuse.current.visible = st === 'dropped' && !!p
+    if (fuse.current.visible && p) fuse.current.position.set(p[0], p[1] + 6, p[2])
+    mat2.opacity = 0.2 + Math.abs(Math.sin(G.time * 4)) * 0.15
+  })
+  return (
+    <>
+      <mesh ref={sock} geometry={GEO.cyl()} material={mat} position={[SOCKET.x, SOCKET.y + 7, SOCKET.z]} scale={[0.9, 14, 0.9]} visible={false} />
+      <mesh ref={fuse} geometry={GEO.cyl()} material={mat2} scale={[0.5, 12, 0.5]} visible={false} />
+    </>
   )
 }

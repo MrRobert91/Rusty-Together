@@ -27,11 +27,15 @@ interface Local {
   /** Wall grip already used this airtime (and the wall it was on). */
   clingUsed: boolean
   clingLastN: Vector3
+  /** Horizontal direction of the current hook swing (the swing plane). */
+  swingDir: Vector3
+  /** When we grabbed the partner's body (their jump/punch after this frees them). */
+  towT: number
 }
 const locals = new WeakMap<Mini, Local>()
 const L = (m: Mini): Local => {
   let l = locals.get(m)
-  if (!l) locals.set(m, (l = { noCatchUntil: 0, lastGround: 0, jumpBuf: -9, netT: -9, netTo: null, prevVy: 0, grabHeldSince: -9, stepPhase: 0, clingUsed: false, clingLastN: new Vector3() }))
+  if (!l) locals.set(m, (l = { noCatchUntil: 0, lastGround: 0, jumpBuf: -9, netT: -9, netTo: null, prevVy: 0, grabHeldSince: -9, stepPhase: 0, clingUsed: false, clingLastN: new Vector3(), swingDir: new Vector3(0, 0, -1), towT: -9 }))
   return l
 }
 
@@ -199,6 +203,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   const lv = b.linvel()
   m.pos.set(p.x, p.y, p.z)
   v.set(lv.x, lv.y, lv.z)
+  if (!m.dead) limitShove(v, m.vel, MINI.maxShove, MINI.maxShoveUp)
 
   if (m.dead) {
     b.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -478,6 +483,7 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
         } else if (canTow(m, partner)) {
           // Grab the partner's body: they come with you while you hold.
           m.towing = true
+          l.towT = t
           m.offering = false
           fx('sfx', { n: 'grab', p: partner.pos })
           fx('particles', { n: 'burst', p: partner.pos, c: '#9cc8ff', s: 0.4 })
@@ -486,9 +492,23 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
       }
     }
   }
-  if (m.towing && (!grabHeld || partner.hidden || partner.dead || m.carrying || m.hangOn >= 0 || partner.hangOn >= 0 || m.pos.distanceTo(partner.pos) > MINI.towBreak)) {
-    m.towing = false
-    fx('sfx', { n: 'release', p: m.pos })
+  if (m.towing) {
+    // The held robot breaks free by jumping or by hitting back.
+    const partnerJumped = partner.jumpT > l.towT + 0.05 && (!partner.grounded || partner.vel.y > 2)
+    const partnerPunched = partner.punchT > l.towT || (partner.cable.punch && partner.cable.state !== 'idle')
+    // A remote partner is seen a network delay late: judge the break on the
+    // raw replica with some slack.
+    const far = partner.kind === 'remote' ? m.pos.distanceTo(partner.netPos) > MINI.towBreak + 2 : m.pos.distanceTo(partner.pos) > MINI.towBreak
+    const lost = !grabHeld || partner.hidden || partner.dead || m.carrying || m.hangOn >= 0 || partner.hangOn >= 0 || far || m.stunT > 0
+    if (lost || partnerJumped || partnerPunched) {
+      m.towing = false
+      fx('sfx', { n: 'release', p: m.pos })
+      if (partnerJumped || partnerPunched) {
+        l.grabHeldSince = t
+        fx('particles', { n: 'burst', p: tmp.copy(partner.pos).addScaledVector(UP, 0.3), c: '#9cc8ff', s: 0.4 })
+        if (m.kind === 'local') rumble(0.35, 0.25, 70)
+      }
+    }
   }
 
 
@@ -501,7 +521,9 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
   if (m.grounded) accel = target.lengthSq() > 0.01 ? MINI.accelGround : MINI.decelGround
   else accel = m.launchedT > 0 ? 7 : MINI.accelAir
   const relLen = rel.length()
-  if (!m.grounded && m.launchedT > 0) {
+  if (m.cable.state === 'attached' && !m.grounded && m.cable.anchorId && !m.cable.anchorId.startsWith('glove')) {
+    swing(m, rel, move, dt)
+  } else if (!m.grounded && m.launchedT > 0) {
     // Ballistic (spring, climb, net return): keep the arc, input only nudges.
     rel.addScaledVector(move, 3 * dt)
   } else if (!m.grounded && relLen > maxS + 0.5) {
@@ -510,29 +532,28 @@ export function stepMini(world: World, m: Mini, inp: StepInput, dt: number, part
     tmp.copy(target).addScaledVector(rel, -along / relLen)
     rel.addScaledVector(tmp, 3 * dt)
     rel.multiplyScalar(1 - 0.35 * dt)
-  } else if (m.cable.state === 'attached' && !m.grounded) {
-    // Swinging: pump with the stick.
-    rel.addScaledVector(move, 9 * dt)
   } else {
     moveTowards(rel, target, accel * dt)
   }
   v.x = rel.x + gv.x
   v.z = rel.z + gv.z
 
-  // Dragged: a soft leash toward the partner holding us (our stick only struggles).
-  if (dragged) {
-    tmp.set(partner.pos.x - m.pos.x, 0, partner.pos.z - m.pos.z)
-    const d = tmp.length()
-    if (d > MINI.towRest) {
-      tmp.divideScalar(d)
-      const pull = Math.min(12, (d - MINI.towRest) * 9)
-      const tx = partner.vel.x * 0.9 + tmp.x * pull + move.x * 1.2
-      const tz = partner.vel.z * 0.9 + tmp.z * pull + move.z * 1.2
-      const k = Math.min(1, 14 * dt)
-      v.x += (tx - v.x) * k
-      v.z += (tz - v.z) * k
-      if (m.grounded && Math.abs(partner.vel.x) + Math.abs(partner.vel.z) > 0.5) m.yaw = dampAngle(m.yaw, Math.atan2(tmp.x, tmp.z), 6, dt)
-    }
+  // Dragged: held at arm's length by the partner's hands (our stick only struggles).
+  if (dragged && m.grounded) {
+    // A remote holder is shown at arm's length from us; follow their real
+    // (network) position, nudged forward by their speed to make up for the delay.
+    const hp = partner.kind === 'remote' ? tmp2.copy(partner.netPos).addScaledVector(partner.vel, 0.08) : partner.pos
+    tmp.set(hp.x - m.pos.x, 0, hp.z - m.pos.z)
+    const d = Math.max(tmp.length(), 1e-3)
+    tmp.divideScalar(d)
+    const err = d - MINI.towRest
+    const pull = clamp(err * 8, -3, 6)
+    const tx = partner.vel.x * 0.95 + tmp.x * pull + move.x * 1.2
+    const tz = partner.vel.z * 0.95 + tmp.z * pull + move.z * 1.2
+    // Follow the hands directly (ground friction would otherwise make us lag behind).
+    v.x = tx
+    v.z = tz
+    if (Math.abs(partner.vel.x) + Math.abs(partner.vel.z) > 0.5) m.yaw = dampAngle(m.yaw, Math.atan2(tmp.x, tmp.z), 6, dt)
   }
 
   /* ---- vertical ---- */
@@ -611,7 +632,15 @@ function finish(m: Mini, vel: Vector3, dt: number, move: Vector3) {
   const b = m.body!
   // Facing.
   if (m.hangOn < 0) {
-    if (move.lengthSq() > 0.01 && m.stunT <= 0) m.yaw = dampAngle(m.yaw, Math.atan2(move.x, move.z), MINI.turnRate, dt)
+    const l = L(m)
+    const partner = G.minis[m.slot === 0 ? 1 : 0]
+    if (m.cable.state === 'attached' && !m.grounded) {
+      // Swinging: face along the swing plane, never spin to track the anchor overhead.
+      m.yaw = dampAngle(m.yaw, Math.atan2(l.swingDir.x, l.swingDir.z), 7, dt)
+    } else if (m.towing && !partner.hidden) {
+      // Dragging: keep facing the partner so both hands stay on them.
+      m.yaw = dampAngle(m.yaw, Math.atan2(partner.pos.x - m.pos.x, partner.pos.z - m.pos.z), 12, dt)
+    } else if (move.lengthSq() > 0.01 && m.stunT <= 0) m.yaw = dampAngle(m.yaw, Math.atan2(move.x, move.z), MINI.turnRate, dt)
     else if (m.cable.state === 'attached') m.yaw = dampAngle(m.yaw, Math.atan2(m.cable.target.x - m.pos.x, m.cable.target.z - m.pos.z), 6, dt)
   }
   m.vel.copy(vel)
@@ -706,6 +735,7 @@ function stepCable(world: World, m: Mini, inp: StepInput, dt: number, partner: M
       }
       c.state = 'attached'
       c.len = Math.max(MINI.minRope, m.pos.distanceTo(a.pos))
+      initSwingDir(m, a.pos, inp)
       G.stats.rings++
       if (a.kind === 'ring') spark('ring', a.pos)
       if (m.kind === 'local') rumble(0.2, 0.4, 60)
@@ -816,9 +846,11 @@ function detach(m: Mini, upBoost: number) {
   c.charge = 0
   c.reeling = false
   if (!m.grounded && upBoost > 0) {
-    // Swing release keeps (and slightly boosts) the arc's momentum.
-    v.x *= 1.2
-    v.z *= 1.2
+    // Swing release keeps (and slightly boosts) the arc's momentum, along the swing.
+    v.x *= 1.15
+    v.z *= 1.15
+    const hs = Math.hypot(v.x, v.z)
+    if (hs > MINI.swingMax * 1.1) { v.x *= (MINI.swingMax * 1.1) / hs; v.z *= (MINI.swingMax * 1.1) / hs }
     v.y = Math.max(v.y, 0) + upBoost
     m.jumpT = G.time
     m.launchedT = 0.25
@@ -835,13 +867,88 @@ export function punchPartner(partner: Mini, dir: Vector3, force: number) {
 export function applyHit(m: Mini, msg: { d: number[]; f: number }) {
   if (m.protectT > 0 || m.dead || m.hidden || !m.body) return
   const lv = m.body.linvel()
-  m.body.setLinvel({ x: lv.x + msg.d[0] * msg.f, y: Math.max(lv.y, 0) + 3.2 + msg.f * 0.25, z: lv.z + msg.d[2] * msg.f }, true)
+  // A knock replaces most of your speed instead of stacking on it: a hit while
+  // running is as strong as a hit standing still (no surprise launches).
+  const keep = 0.3
+  setMiniVel(m, lv.x * keep + msg.d[0] * msg.f, Math.min(Math.max(lv.y, 0) * 0.5 + 3.2 + msg.f * 0.25, 6.5), lv.z * keep + msg.d[2] * msg.f)
   m.stunT = 0.35
+  m.towing = false
   m.protectT = MINI.knockProtect
   m.launchedT = 0.4
   m.jumpT = G.time
   if (m.hangOn >= 0) m.hangOn = -1
   if (m.kind === 'local') rumble(0.8, 0.5, 160)
+}
+
+/** Intentional velocity change from outside the controller (knock-back, scripted launch). */
+export function setMiniVel(m: Mini, x: number, y: number, z: number) {
+  m.vel.set(x, y, z)
+  m.body?.setLinvel({ x, y, z }, true)
+}
+
+/**
+ * Contacts may push a robot, but a single physics step of contacts (a crate
+ * landing, a kinematic gate or sweeper, a box handed over) may only ADD a
+ * bounded amount of speed on top of what the controller asked for. Slowing
+ * down (walls, floors) is never limited.
+ */
+export function limitShove(vel: Vector3, wanted: Vector3, maxH: number, maxUp: number) {
+  const hw = Math.hypot(wanted.x, wanted.z)
+  const hv = Math.hypot(vel.x, vel.z)
+  const cap = hw + maxH
+  if (hv > cap) { vel.x *= cap / hv; vel.z *= cap / hv }
+  const capY = Math.max(wanted.y, 0) + maxUp
+  if (vel.y > capY) vel.y = capY
+  return vel
+}
+
+/** Pick the swing plane when the hook latches: where the player wants to go. */
+function initSwingDir(m: Mini, anchor: Vector3, inp: StepInput) {
+  const l = L(m)
+  const d = l.swingDir
+  if (inp.move.lengthSq() > 0.09) d.set(inp.move.x, 0, inp.move.z)
+  else {
+    d.set(anchor.x - m.pos.x, 0, anchor.z - m.pos.z)
+    if (d.lengthSq() < 0.09) d.set(G.cam.fwd.x, 0, G.cam.fwd.z)
+  }
+  if (d.lengthSq() < 1e-4) facing(m, d)
+  d.normalize()
+}
+
+/**
+ * Pendulum on a hook, kept in a vertical plane: the stick pumps along the
+ * swing and can only turn the plane slowly; sideways speed bleeds off, so the
+ * robot neither orbits the anchor nor drifts sideways when going forward.
+ */
+function swing(m: Mini, rel: Vector3, move: Vector3, dt: number) {
+  const l = L(m)
+  const d = l.swingDir
+  const c = m.cable
+  // Steer: only the stick's sideways part turns the plane, and slowly.
+  const side = move.x * d.z - move.z * d.x // >0: stick to the right of the swing
+  if (Math.abs(side) > 0.25) {
+    const ang = -clamp(side, -1, 1) * MINI.swingSteer * dt
+    const cs = Math.cos(ang), sn = Math.sin(ang)
+    const x = d.x * cs - d.z * sn
+    const z = d.x * sn + d.z * cs
+    d.set(x, 0, z).normalize()
+  }
+  // Pump along the plane.
+  const along = move.x * d.x + move.z * d.z
+  rel.addScaledVector(d, along * MINI.swingPump * dt)
+  // Bleed sideways speed and drift back into the anchor's plane.
+  const va = rel.x * d.x + rel.z * d.z
+  let lx = rel.x - d.x * va
+  let lz = rel.z - d.z * va
+  const keep = Math.exp(-MINI.swingLatDamp * dt)
+  lx *= keep; lz *= keep
+  const ox = m.pos.x - c.target.x, oz = m.pos.z - c.target.z
+  const off = ox * d.z - oz * d.x // sideways offset from the plane through the anchor
+  lx -= d.z * off * 2.5 * dt
+  lz += d.x * off * 2.5 * dt
+  rel.set(d.x * va + lx, 0, d.z * va + lz)
+  const hs = rel.length()
+  if (hs > MINI.swingMax) rel.multiplyScalar(MINI.swingMax / hs)
 }
 
 export function nearestBox(m: Mini): string | null {

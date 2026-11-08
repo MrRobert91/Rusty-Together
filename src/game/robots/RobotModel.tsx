@@ -30,6 +30,8 @@ export interface RobotView {
   now: number
   expression?: Expression
   lookAt?: THREE.Vector3 | null
+  /** Stretch the (elastic) arms so the hands really touch their targets. */
+  reach?: boolean
   torsion?: number
   legPush?: [number, number]
   /** Written by the model: world-space hand positions (for cables & HUD). */
@@ -55,6 +57,8 @@ interface Props {
 }
 
 const UP = new THREE.Vector3(0, -1, 0)
+/** Shoulder → fist centre in torso-local units (arm at rest). */
+const ARM_LEN = 0.3
 const tmp = new THREE.Vector3()
 const tmp2 = new THREE.Vector3()
 const q = new THREE.Quaternion()
@@ -102,7 +106,7 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
   const st = useRef({
     phase: 0, speed: 0, yaw: view.yaw, lean: 0, side: 0, blinkAt: 1 + Math.random() * 3, blinkUntil: 0,
     antX: [new Spring(), new Spring()], antZ: [new Spring(), new Spring()], prevVel: new THREE.Vector3(), accel: new THREE.Vector3(),
-    stepSide: 0, crouch: 0, offer: 0, hang: 0, carry: 0, armBlend: [0, 0], lookX: 0, lookY: 0, torsion: 0,
+    stepSide: 0, crouch: 0, offer: 0, hang: 0, carry: 0, armBlend: [0, 0], armStretch: [1, 1], lookX: 0, lookY: 0, torsion: 0,
   })
 
   // Bake sibling parts per joint into single meshes (fewer draw calls).
@@ -209,13 +213,20 @@ export function RobotModel({ variant, slot, view, visible }: Props) {
         sh.parent!.updateWorldMatrix(true, false)
         tmp.copy(target)
         sh.parent!.worldToLocal(tmp)
-        tmp.sub(sh.position).normalize()
+        tmp.sub(sh.position)
+        const dist = tmp.length()
+        tmp.divideScalar(Math.max(dist, 1e-4))
         q.setFromUnitVectors(UP, tmp)
         qInv.setFromEuler(sh.rotation)
         qInv.slerp(q, s.armBlend[i])
         sh.quaternion.copy(qInv)
         el.rotation.x = -bendA * (1 - s.armBlend[i])
-      }
+        // Elastic arms: stretch (or tuck) so the fist lands on the target.
+        const want = v.reach ? THREE.MathUtils.clamp(dist / ARM_LEN, 0.75, 2.2) : 1
+        s.armStretch[i] = damp(s.armStretch[i], 1 + (want - 1) * s.armBlend[i], 18, dt)
+      } else s.armStretch[i] = damp(s.armStretch[i], 1, 18, dt)
+      sh.scale.set(1, s.armStretch[i], 1)
+      hand[i].current.scale.set(1, 1 / s.armStretch[i], 1)
       hand[i].current.visible = !v.fistAway[i]
       hand[i].current.getWorldPosition(v.handWorld[i])
     }

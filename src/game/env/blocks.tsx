@@ -33,6 +33,20 @@ export function envMat(kind: string): THREE.MeshStandardMaterial {
   return m as THREE.MeshStandardMaterial
 }
 
+/** A floor/wall decal version of an env material: drawn on top of coplanar surfaces. */
+export function decalMat(kind: string): THREE.MeshStandardMaterial {
+  const key = `decal:${kind}`
+  let m = matCache.get(key)
+  if (!m) {
+    m = envMat(kind).clone()
+    m.polygonOffset = true
+    m.polygonOffsetFactor = -2
+    m.polygonOffsetUnits = -4
+    matCache.set(key, m)
+  }
+  return m as THREE.MeshStandardMaterial
+}
+
 /** Box geometry whose UVs are in world metres (1 tile = `tile` m), so textures never stretch. */
 const boxCache = new Map<string, THREE.BufferGeometry>()
 export function worldBox(w: number, h: number, d: number, tile = 4) {
@@ -65,13 +79,16 @@ export interface BlockProps {
 /** The workhorse level piece: rock / metal / wood slab with a grassy top. */
 export function Block({ pos, size, kind = 'rock', grass = kind === 'rock', rotY = 0, ud, trim = kind === 'rock', tufts, noCollide }: BlockProps) {
   const [w, h, d] = size
-  const body = useMemo(() => worldBox(w, h, d, kind === 'rock' ? 5 : 2), [w, h, d, kind])
+  // Top faces get world-planar UVs: where two blocks overlap at the same height
+  // their tops render identically instead of flickering (z-fighting).
+  const body = useMemo(() => worldTopUV(worldBox(w, h, d, kind === 'rock' ? 5 : 2), pos, rotY, kind === 'rock' ? 5 : 2), [w, h, d, kind, pos[0], pos[1], pos[2], rotY]) // eslint-disable-line react-hooks/exhaustive-deps
+  const grassTop = useMemo(() => (grass ? worldTopUV(worldBox(w + 0.12, 0.16, d + 0.12, 3), pos, rotY, 3) : null), [grass, w, d, pos[0], pos[1], pos[2], rotY]) // eslint-disable-line react-hooks/exhaustive-deps
   const tuftGeo = useMemo(() => (grass ? makeTufts(w, d, tufts ?? Math.min(60, Math.floor(w * d * 0.6))) : null), [grass, w, d, tufts])
   const lip = useMemo(() => (grass ? makeGrassLip(w, d) : null), [grass, w, d])
   const content = (
     <group userData={{ batch: true }}>
       <mesh geometry={body} material={envMat(kind)} position-y={-h / 2} castShadow receiveShadow />
-      {grass && <mesh geometry={worldBox(w + 0.12, 0.16, d + 0.12, 3)} material={envMat('grass')} position-y={-0.06} receiveShadow />}
+      {grassTop && <mesh geometry={grassTop} material={envMat('grass')} position-y={-0.06} receiveShadow />}
       {lip && <mesh geometry={lip} material={envMat('grass')} position-y={-0.05} castShadow />}
       {tuftGeo && <mesh geometry={tuftGeo} material={envMat('leaf')} position-y={0.08} castShadow />}
       {trim && h > 1 && (
@@ -90,6 +107,23 @@ export function Block({ pos, size, kind = 'rock', grass = kind === 'rock', rotY 
       {content}
     </RigidBody>
   )
+}
+
+/** Copy of a box whose upward face has UVs planar in world XZ (block at `pos`, turned `rotY`). */
+function worldTopUV(src: THREE.BufferGeometry, pos: V3, rotY: number, tile: number) {
+  const g = src.clone()
+  const p = g.attributes.position
+  const n = g.attributes.normal
+  const uv = g.attributes.uv as THREE.BufferAttribute
+  const c = Math.cos(rotY), s = Math.sin(rotY)
+  for (let i = 0; i < p.count; i++) {
+    if (n.getY(i) < 0.9) continue
+    const lx = p.getX(i), lz = p.getZ(i)
+    const wx = pos[0] + lx * c + lz * s
+    const wz = pos[2] - lx * s + lz * c
+    uv.setXY(i, wx / tile, -wz / tile)
+  }
+  return g
 }
 
 function makeTufts(w: number, d: number, n: number) {
@@ -199,8 +233,9 @@ export function Banner({ pos, rotY = 0, color = '#f2b51d' }: { pos: V3; rotY?: n
 }
 
 export function HazardStrip({ pos, size, rotY = 0 }: { pos: V3; size: [number, number]; rotY?: number }) {
+  // Lifted clear of the grass top and depth-offset: no z-fighting at a distance.
   return (
-    <mesh position={pos} rotation={[-Math.PI / 2, 0, rotY]} receiveShadow material={envMat('hazard')} userData={{ batch: true }}>
+    <mesh position={[pos[0], pos[1] + 0.03, pos[2]]} rotation={[-Math.PI / 2, 0, rotY]} receiveShadow material={decalMat('hazard')} userData={{ batch: true }}>
       <planeGeometry args={size} />
     </mesh>
   )

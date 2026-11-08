@@ -42,10 +42,18 @@ export const MINI = {
   wallJumpUp: 0.85, // × jump velocity
   wallJumpOut: 4.2,
   towReach: 1.5, // grab your partner's body within this distance
-  towRest: 1.15, // dragged partner trails at this distance
-  towBreak: 3.6,
-  towSpeed: 3.6, // walking speed while dragging
+  towRest: 0.74, // dragged partner is held at arm's length: the hands touch their body
+  towBreak: 2.6,
+  towSpeed: 3.4, // walking speed while dragging
   respawnDelay: 1.1,
+  /** Max speed a single physics step of contacts (props, crates, sweepers) may ADD. */
+  maxShove: 4.5,
+  maxShoveUp: 3,
+  /** Hook swing: pumping along the swing plane, lateral damping, steering and a speed cap. */
+  swingPump: 7,
+  swingLatDamp: 5,
+  swingSteer: 0.8, // rad/s the stick can turn the swing plane
+  swingMax: 10.5,
 }
 
 export const BIG = {
@@ -73,6 +81,10 @@ export const BIG = {
   mergeTime: 1.2,
   gripRange: 2.2,
   punchRange: 3.6,
+  maxShove: 4,
+  maxShoveUp: 3,
+  swingLatDamp: 4,
+  swingMax: 9,
 }
 
 export const NET = {

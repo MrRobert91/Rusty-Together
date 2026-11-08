@@ -35,6 +35,7 @@ function knockBig(dir: THREE.Vector3, force: number) {
   if (!isHost() || !B.active || !B.body || B.dead || B.protectT > 0) return
   const v = B.body.linvel()
   B.body.setLinvel({ x: v.x + dir.x * force, y: Math.max(v.y, 0) + 5.5, z: v.z + dir.z * force }, true)
+  B.vel.set(v.x + dir.x * force, Math.max(v.y, 0) + 5.5, v.z + dir.z * force)
   B.stunT = 0.45
   B.launchedT = 0.45
   B.protectT = 1.4

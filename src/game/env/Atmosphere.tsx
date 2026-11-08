@@ -8,6 +8,16 @@ import { usePerf, tier } from '../../core/device'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 const SUN = new THREE.Vector3(60, 80, 40)
+/** Half-size of the sun's shadow box (m). */
+const SHADOW_HALF = 28
+/** Light-space axes of the shadow camera (it looks from SUN toward the target, up = +Y). */
+const LS = (() => {
+  const fwd = SUN.clone().normalize()
+  const right = new THREE.Vector3(0, 1, 0).cross(fwd).normalize()
+  const up = fwd.clone().cross(right).normalize()
+  return { fwd, right, up }
+})()
+const snapped = new THREE.Vector3()
 
 /** Levels set where the playable space is so the scenery frames it instead of blocking it. */
 export const backdropCfg = { cx: 0, cz: -60, inner: 85 }
@@ -27,9 +37,17 @@ export function Atmosphere() {
   useFrame(() => {
     const l = light.current
     if (!l) return
+    // Follow the camera, but snapped to whole shadow-map texels in light space:
+    // a shadow camera sliding by sub-texel amounts makes every shadow edge
+    // shimmer and crawl (the constant flicker on belts, rails and grass).
     const t = G.cam.target
-    l.position.set(t.x + SUN.x * 0.5, t.y + SUN.y * 0.5, t.z + SUN.z * 0.5)
-    l.target.position.copy(t)
+    const texel = (SHADOW_HALF * 2) / (high ? 2048 : 1024)
+    const a = Math.round(t.dot(LS.right) / texel) * texel
+    const b = Math.round(t.dot(LS.up) / texel) * texel
+    const c = t.dot(LS.fwd)
+    snapped.set(0, 0, 0).addScaledVector(LS.right, a).addScaledVector(LS.up, b).addScaledVector(LS.fwd, c)
+    l.position.set(snapped.x + SUN.x * 0.5, snapped.y + SUN.y * 0.5, snapped.z + SUN.z * 0.5)
+    l.target.position.copy(snapped)
     l.target.updateMatrixWorld()
   })
 
@@ -43,10 +61,10 @@ export function Atmosphere() {
         intensity={2.75}
         castShadow={t !== 'low'}
         shadow-mapSize={high ? [2048, 2048] : [1024, 1024]}
-        shadow-camera-left={-28}
-        shadow-camera-right={28}
-        shadow-camera-top={28}
-        shadow-camera-bottom={-28}
+        shadow-camera-left={-SHADOW_HALF}
+        shadow-camera-right={SHADOW_HALF}
+        shadow-camera-top={SHADOW_HALF}
+        shadow-camera-bottom={-SHADOW_HALF}
         shadow-camera-near={1}
         shadow-camera-far={220}
         shadow-bias={-0.0004}

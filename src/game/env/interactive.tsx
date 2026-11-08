@@ -7,6 +7,7 @@ import { hostSet } from '../net/replication'
 import { plates } from '../Simulation'
 import { envMat, worldBox, type V3 } from './blocks'
 import { beltTex, signTex } from './textures'
+import { registerSign } from '../signs'
 import { GEO, M } from '../robots/materials'
 import { useRigMerge } from '../perf/StaticBatch'
 import { BIG, BTN_COLOR, COLORS, MINI, SLOT_COLOR } from '../tuning'
@@ -152,7 +153,8 @@ export function Conveyor({ pos, size, dir, speed, speedVar, rotY = 0 }: { pos: V
     t.repeat.set(w / 1.2, d / 1.2)
     return t
   }, [w, d])
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.2 }), [tex])
+  // Belt surface: lifted clear of the deck below and depth-offset (it used to z-fight and flicker).
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), [tex])
   // Arrow direction in texture space: belt texture arrows point +V.
   const ang = Math.atan2(dir[0], -dir[1])
   useFrame((_, dt) => {
@@ -165,7 +167,7 @@ export function Conveyor({ pos, size, dir, speed, speedVar, rotY = 0 }: { pos: V
       <RigidBody type="fixed" colliders={false} userData={{ conveyor: [dir[0] * speed, 0, dir[1] * speed], speedVar }}>
         <CuboidCollider args={[w / 2, 0.15, d / 2]} position={[0, -0.15, 0]} friction={0.8} />
       </RigidBody>
-      <mesh position-y={0.01} rotation={[-Math.PI / 2, 0, ang]} material={mat} receiveShadow>
+      <mesh position-y={0.035} rotation={[-Math.PI / 2, 0, ang]} material={mat} receiveShadow>
         <planeGeometry args={Math.abs(Math.sin(ang)) > 0.5 ? [d, w] : [w, d]} />
       </mesh>
       <mesh geometry={worldBox(w + 0.3, 0.5, d + 0.3, 2)} material={envMat('metal')} position-y={-0.27} receiveShadow />
@@ -358,7 +360,7 @@ export function SpringPad({ pos, bounce = 15, rotY = 0 }: { pos: V3; bounce?: nu
       <mesh geometry={GEO.torus()} material={envMat('yellow')} rotation-x={Math.PI / 2} scale={[0.6, 0.6, 1.6]} position-y={0.17} userData={{ batch: true }} />
       <group ref={top}>
         <mesh geometry={GEO.cyl()} material={envMat('pad')} scale={[0.9, 0.08, 0.9]} castShadow />
-        <mesh geometry={GEO.ringFlat()} material={M.glow('#ffd23a', 1.5)} rotation-x={-Math.PI / 2} position-y={0.05} scale={0.6} />
+        <mesh geometry={GEO.ringFlat()} material={M.glow('#ffd23a', 1.5)} rotation-x={-Math.PI / 2} position-y={0.065} scale={0.6} />
       </group>
     </group>
   )
@@ -415,9 +417,11 @@ export function CouplePlate({ id, pos, yaw = 0, radius = 2.4, enabledVar }: { id
 export function Sign({ pos, rotY = 0, text, sub = '', small = false, post = true, bg }: { pos: V3; rotY?: number; text: string; sub?: string; small?: boolean; post?: boolean; bg?: string }) {
   const tex = useMemo(() => signTex(text, sub, bg), [text, sub, bg])
   const s = small ? 0.6 : 1
+  useEffect(() => registerSign(pos, text, sub), [pos[0], pos[1], pos[2], text, sub]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <group position={pos} rotation-y={rotY} userData={{ batch: true }}>
-      <mesh scale={[2.6 * s, 1.3 * s, 1]} castShadow><planeGeometry /><meshStandardMaterial map={tex} roughness={0.6} /></mesh>
+      {/* Face sits clearly in front of the backing board (no z-fighting at a distance). */}
+      <mesh position-z={0.03} scale={[2.6 * s, 1.3 * s, 1]} castShadow><planeGeometry /><meshStandardMaterial map={tex} roughness={0.6} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} /></mesh>
       <mesh position-z={-0.03} scale={[2.75 * s, 1.45 * s, 0.05]} material={envMat('dark')} geometry={GEO.box()} />
       {post && <mesh geometry={GEO.cyl()} material={envMat('dark')} position-y={-1.2 * s} scale={[0.06, 1.8 * s, 0.06]} />}
     </group>
