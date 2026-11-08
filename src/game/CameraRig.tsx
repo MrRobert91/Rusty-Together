@@ -75,25 +75,27 @@ export function CameraRig() {
 
     let pitch = C.pitch
     let dist = 6.5
+    // Each player orbits their own camera (this rig is local to each client),
+    // also while joined: controls are camera-relative per pilot.
+    const lx = human.look.x
+    const ly = human.look.y
+    C.yaw += lx
+    C.pitch = clamp(C.pitch - ly, -0.25, 1.15)
+    if (Math.abs(lx) + Math.abs(ly) > 0.0005) s.idle = 0
+    else s.idle += dt
     if (joined) {
-      // Guided shared camera: identical on both clients.
-      // Never chase the body's facing (controls are camera-relative, that would
-      // spiral); only level-authored hints rotate the shared view.
+      // Level-authored hints only guide the view while this player leaves the
+      // camera alone (never chase the body's facing: that would spiral).
       const hint = camHints.fn ? camHints.fn(G.big.pos) : null
-      if (hint) C.yaw = dampAngle(C.yaw, hint.yaw, 1.4, dt)
-      pitch = hint?.pitch ?? 0.36
-      dist = hint?.dist ?? 10.5
-      C.pitch = damp(C.pitch, pitch, 2, dt)
+      if (hint && s.idle > 1.6) {
+        C.yaw = dampAngle(C.yaw, hint.yaw, 1.2, dt)
+        if (hint.pitch !== undefined) C.pitch = damp(C.pitch, hint.pitch, 1.2, dt)
+      }
       pitch = C.pitch
+      dist = hint?.dist ?? 10.5
     } else {
-      const lx = human.look.x
-      const ly = human.look.y
-      C.yaw += lx
-      C.pitch = clamp(C.pitch - ly, -0.25, 1.15)
       pitch = C.pitch
       const moving = Math.hypot(me.vel.x, me.vel.z) > 1
-      if (Math.abs(lx) + Math.abs(ly) > 0.0005) s.idle = 0
-      else s.idle += dt
       if (moving && s.idle > (human.frame.device === 'touch' ? 0.8 : 1.4) && me.cable.state === 'idle') {
         C.yaw = dampAngle(C.yaw, me.yaw + Math.PI, 0.9, dt)
         C.pitch = damp(C.pitch, 0.3, 0.6, dt)

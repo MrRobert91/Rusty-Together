@@ -153,7 +153,8 @@ function Room2() {
   return (
     <>
       {/* Lane base */}
-      <Block pos={[0, 2.4, -42.8]} size={[11.6, 10.4, 14.4]} grass={false} kind="metal" noCollide />
+      {/* (sits a few cm low: the plate floors and belt decks on top must not share its surface) */}
+      <Block pos={[0, 2.35, -42.8]} size={[11.6, 10.35, 14.4]} grass={false} kind="metal" noCollide />
       {/* Two conveyors flowing back toward the start */}
       <Conveyor pos={[-3, 2.4, -41.5]} size={[3.6, 11]} dir={[0, 1]} speed={2.2} speedVar="cvL" />
       <Conveyor pos={[3, 2.4, -41.5]} size={[3.6, 11]} dir={[0, 1]} speed={2.2} speedVar="cvR" />

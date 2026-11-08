@@ -4,6 +4,7 @@ import type { World } from '@dimforge/rapier3d-compat'
 import { G, act, ballistic, clamp, dampAngle, fx, type Combined, type Anchor } from '../runtime'
 import { BIG, GRAVITY } from '../tuning'
 import { lineOfSight, newGroundHit, probeGround } from './physicsUtil'
+import { limitShove } from './miniController'
 import { settings } from '../../core/settings'
 import { toast } from '../hud'
 
@@ -86,6 +87,7 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
   const lv = b.linvel()
   B.pos.set(p.x, p.y, p.z)
   v.set(lv.x, lv.y, lv.z)
+  if (!B.dead) limitShove(v, B.vel, BIG.maxShove, BIG.maxShoveUp)
 
   if (B.dead) {
     b.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -171,7 +173,17 @@ export function stepBig(world: World, B: Combined, P: [PilotFrame, PilotFrame], 
   target.copy(dir).multiplyScalar(speed)
   rel.set(v.x - gv.x, 0, v.z - gv.z)
   if (hanging && !B.grounded) {
-    rel.addScaledVector(avg, 7 * dt)
+    // Swinging from the rings: pump forward/back along the body's facing; the
+    // sideways part of the swing bleeds off so it never spins or drifts.
+    const fx_ = Math.sin(B.yaw), fz = Math.cos(B.yaw)
+    const pump = avg.x * fx_ + avg.z * fz
+    rel.x += fx_ * pump * 6 * dt
+    rel.z += fz * pump * 6 * dt
+    const va = rel.x * fx_ + rel.z * fz
+    const keep = Math.exp(-BIG.swingLatDamp * dt)
+    rel.set(fx_ * va + (rel.x - fx_ * va) * keep, 0, fz * va + (rel.z - fz * va) * keep)
+    const hs = rel.length()
+    if (hs > BIG.swingMax) rel.multiplyScalar(BIG.swingMax / hs)
   } else if (!B.grounded && B.launchedT > 0) {
     rel.addScaledVector(target, 1.5 * dt)
   } else {

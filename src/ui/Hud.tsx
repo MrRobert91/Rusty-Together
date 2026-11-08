@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { useHud } from '../game/hud'
+import { hideInfo, showInfo, useHud, type Prompt } from '../game/hud'
+import { marks } from '../game/HudSystem'
 import { useVoice } from '../net/voice'
 import { currentDevice, deviceText, glyph, onDeviceChange, type Btn, type Device } from '../core/input'
 import { G, localSlot, peerSlot } from '../game/runtime'
@@ -29,7 +30,6 @@ export function Key({ btn, device }: { btn: Btn; device: Device }) {
 
 export function Hud() {
   const h = useHud()
-  const device = useDevice()
   const voice = useVoice()
   const session = useApp((s) => s.session)
   const me = localSlot()
@@ -75,7 +75,7 @@ export function Hud() {
           <div className="room-mode">{h.roomTitle.mode}</div>
         </div>
       )}
-      {h.objective && <div className="objective"><span>◆</span> {deviceText(h.objective, device)}</div>}
+      <InfoPanel />
       {h.banner && (
         <div className="banner" key={h.banner.title} style={{ ['--bc' as any]: h.banner.color ?? '#ffd23a' }}>
           <div className="banner-title">{h.banner.title}</div>
@@ -84,22 +84,8 @@ export function Hud() {
       )}
       {h.arena && <ArenaBoard />}
 
-      {/* Prompts */}
-      <div className="prompts">
-        {h.prompts.map((p) => (
-          <div key={p.id} className="prompt">
-            {p.btn && <Key btn={p.btn} device={device} />}
-            {p.hold && <span className="hold">mantén</span>}
-            <span>{deviceText(p.text, device)}</span>
-            {p.progress !== undefined && p.progress > 0 && <div className="prompt-progress"><div style={{ width: `${p.progress * 100}%` }} /></div>}
-          </div>
-        ))}
-      </div>
-
-      {h.subtitle && <div className="subtitle"><b style={{ color: h.subtitle.color }}>{h.subtitle.who}:</b> {deviceText(h.subtitle.text, device)}</div>}
-      <div className="toasts in-game">
-        {h.toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{deviceText(t.text, device)}</div>)}
-      </div>
+      {/* Only the button to press: on the glowing target, or small at the bottom. */}
+      <ButtonHints />
       {h.stickers.length > 0 && <div className="stickers">{h.stickers.map((s, i) => <span key={i} title="Pegatina de sesión">{s}</span>)}</div>}
 
       <PartnerArrow />
@@ -343,5 +329,115 @@ function PeerDropped() {
         <div className="banner-sub">Tu compañero se ha desconectado. Esperando a que vuelva (hasta 90 s)…</div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Top-right ⓘ: messages (objective, hints, the sign you are reading, chatter)
+ * open next to it and fold away by themselves after 4 s. Click / tap it (or
+ * press I) to read the current objective again.
+ */
+function InfoPanel() {
+  const info = useHud((s) => s.info)
+  const open = useHud((s) => s.infoOpen)
+  const objective = useHud((s) => s.objective)
+  const device = useDevice()
+  // A new objective opens the bubble once.
+  useEffect(() => { if (objective) showInfo(objective, 'obj', { key: `obj:${objective}` }) }, [objective])
+  const reopen = () => {
+    const o = useHud.getState().objective
+    if (useHud.getState().infoOpen) hideInfo()
+    else if (o) showInfo(o, 'obj', { key: `obj:${o}` })
+    else { const i = useHud.getState().info; if (i) showInfo(i.text, i.tone, { key: i.key, who: i.who, color: i.color }) }
+  }
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.code === 'KeyI' && !e.repeat) reopen() }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
+  const tone = info?.tone ?? 'obj'
+  return (
+    <div className="info-wrap">
+      <button className={`info-btn ${open ? 'open' : ''}`} onClick={reopen} onTouchStart={(e) => { e.stopPropagation() }} aria-label="Información">i</button>
+      {open && info && (
+        <div key={info.key} className={`info-bubble ${tone}`}>
+          {tone === 'sign' && <span className="info-icon">📋</span>}
+          {info.who && <b style={{ color: info.color }}>{info.who}: </b>}
+          {deviceText(info.text, device)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const MARK_BTNS = ['context', 'grab', 'punch'] as const
+
+/**
+ * Button hints without text: the glyph of the button to press floats over the
+ * glowing target (which lights up in that button's colour); hints with no
+ * target show the glyph alone at the bottom, semi-transparent. Hold actions
+ * get a ring that fills up.
+ */
+function ButtonHints() {
+  const prompts = useHud((s) => s.prompts)
+  const device = useDevice()
+  const refs = { context: useRef<HTMLDivElement>(null), grab: useRef<HTMLDivElement>(null), punch: useRef<HTMLDivElement>(null) }
+  // One hint per button: the first prompt that asks for it.
+  const byBtn = new Map<string, Prompt>()
+  for (const p of prompts) if (p.btn && !byBtn.has(p.btn)) byBtn.set(p.btn, p)
+  const [onMark, setOnMark] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    let raf = 0
+    const v = new THREE.Vector3()
+    const loop = () => {
+      const cam = cameraRef.current
+      const next: Record<string, boolean> = {}
+      for (const k of MARK_BTNS) {
+        const el = refs[k].current
+        const mk = marks[k]
+        let shown = false
+        if (el && cam && mk.on) {
+          v.copy(mk.pos)
+          v.y += mk.flat > 0 ? 0.6 : 0.75
+          v.project(cam)
+          if (v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05) {
+            shown = true
+            el.style.left = `${(v.x * 0.5 + 0.5) * 100}%`
+            el.style.top = `${(-v.y * 0.5 + 0.5) * 100}%`
+          }
+        }
+        if (el) el.style.display = shown ? 'block' : 'none'
+        next[k] = shown
+      }
+      setOnMark((cur) => (MARK_BTNS.some((k) => cur[k] !== next[k]) ? next : cur))
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const loose = [...byBtn.values()].filter((p) => !onMark[p.btn!])
+  return (
+    <>
+      {MARK_BTNS.map((k) => {
+        const p = byBtn.get(k)
+        return (
+          <div key={k} ref={refs[k]} className="btn-hint on-target" style={{ display: 'none' }}>
+            {p && <HintGlyph p={p} device={device} />}
+          </div>
+        )
+      })}
+      <div className="btn-hints">
+        {loose.map((p) => <div key={p.btn} className="btn-hint"><HintGlyph p={p} device={device} /></div>)}
+      </div>
+    </>
+  )
+}
+
+function HintGlyph({ p, device }: { p: Prompt; device: Device }) {
+  const prog = p.progress ?? 0
+  return (
+    <span className={`hint-glyph ${p.hold ? 'hold' : ''}`} style={{ ['--prog' as any]: `${Math.round(prog * 100)}%`, ['--bc' as any]: (BTN_COLOR as Record<string, string>)[p.btn!] }}>
+      <Key btn={p.btn!} device={device} />
+    </span>
   )
 }

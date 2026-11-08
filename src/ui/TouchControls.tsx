@@ -8,7 +8,7 @@ import { setPaused } from './PauseMenu'
 /**
  * Mobile controls, laid out for two thumbs in landscape:
  *  - left half: floating stick that appears under the thumb,
- *  - right half: drag anywhere to look (or aim the arm when joined),
+ *  - right half: drag anywhere to look (joined too: your arm aims where you look),
  *  - bottom-right: GameCube-style cluster. A big round jump button and three
  *    round buttons hugging it from the left and above (Pegar where the GC «B»
  *    sits, Agarrar up-left, Acción on top), so the thumb rolls between them

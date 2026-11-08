@@ -270,9 +270,13 @@ export function sampleBodies(localSlot: Slot, carryTarget: (id: string) => Vecto
   for (const nb of G.bodies.values()) {
     const own = carryTarget(nb.id)
     if (own) {
+      // Our own pick-up: stop colliding right away (before the host confirms),
+      // or the crate snapping into our hands would launch us.
+      if (nb.body.numColliders() > 0 && !nb.body.collider(0).isSensor()) for (let i = 0; i < nb.body.numColliders(); i++) nb.body.collider(i).setSensor(true)
       nb.body.setNextKinematicTranslation({ x: own.x, y: own.y, z: own.z })
       continue
     }
+    if (nb.heldBy < 0 && nb.body.numColliders() > 0 && nb.body.collider(0).isSensor()) for (let i = 0; i < nb.body.numColliders(); i++) nb.body.collider(i).setSensor(false)
     const buf = nb.buf
     if (!buf.length) continue
     let i = buf.length - 1

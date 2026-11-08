@@ -4,7 +4,7 @@ import { G, ballistic, fx, type Mini } from '../runtime'
 import type { StepInput } from '../control'
 import type { PilotFrame } from '../robots/bigController'
 import { GRAVITY, MINI } from '../tuning'
-import { respawnMini } from '../robots/miniController'
+import { respawnMini, setMiniVel } from '../robots/miniController'
 
 /**
  * Ámbar-bot: the solo-tutorial partner. Navigation uses a Yuka Vehicle with an
@@ -226,7 +226,7 @@ class CrossState extends State<Brain> {
           fx('sfx', { n: 'cableFire', p: b.me.pos })
           fx('sfx', { n: 'cableHit', p: ring.pos })
           const v = ballistic(b.me.pos, m.to.clone().setY(m.to.y + MINI.feet), 1.1, GRAVITY)
-          b.me.body.setLinvel({ x: v.x, y: v.y, z: v.z }, true)
+          setMiniVel(b.me, v.x, v.y, v.z)
           b.me.launchedT = 1.1
           b.me.jumpT = G.time
         }

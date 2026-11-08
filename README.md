@@ -13,7 +13,17 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
 
 🎬 **Tráiler (1 min, gameplay real):** [`docs/trailer.mp4`](docs/trailer.mp4)
 
-## Novedades: ¡a jugar en serio (y en broma)!
+## Novedades: física más fiable y pantalla más limpia
+
+- **Física sin sustos.** Un empujón de contactos (cajas, puertas, barredoras, una caja que coges) solo puede añadir una velocidad limitada por paso de física, y un golpe sustituye tu velocidad en vez de sumarse a ella: nadie sale disparado por coger una caja o por un roce. Las cajas sueltas ya no saltan por los aires al chocar con un robot. Online, la caja que coges deja de colisionar al instante, sin esperar al anfitrión.
+- **Agarrar al compañero de verdad.** Tus dos manos se apoyan en su cuerpo (los brazos son elásticos y se estiran hasta tocarlo), lo sujetas a la distancia del brazo y lo miras mientras lo arrastras. Si salta o te pega, se suelta.
+- **Ganchos controlables.** El balanceo va en un plano: el stick bombea hacia delante y atrás, la velocidad lateral se amortigua, el robot mira en la dirección del balanceo (ya no gira al pasar bajo el anillo) y el stick solo tuerce el plano poco a poco. Lo mismo con los brazos del cuerpo unido.
+- **HUD limpio.** Ya no hay carteles de texto en el centro: lo que puedes usar **se ilumina** con el color del botón y encima flota solo el botón, semitransparente (con un anillo que se llena si hay que mantenerlo). Los objetivos, avisos y diálogos salen junto a un botón **ⓘ** arriba a la derecha y se pliegan solos a los 4 s; pulsa ⓘ (o la tecla I) para releer el objetivo. Los carteles del escenario se «leen» al acercarte y mirarlos.
+- **Cámara propia también unidos.** En el cuerpo compartido cada jugador gira su propia cámara (ratón, stick derecho o arrastre) sin afectar al otro; tu brazo apunta hacia donde miras.
+- **Fusible a prueba de caídas.** Si el fusible cae fuera del suelo o dentro del cangrejo, reaparece en un sitio accesible y brilla con un haz de luz; la placa de acoplamiento sigue activa hasta encajarlo, así que podéis separaros y volver a uniros. Basta con llegar a la tarima de la toma (iluminada) con el fusible para que encaje solo, y soltar una mano un momento no lo tira. Sobre cada asa aparece un indicador con tu color: **AGARRA**, **SUELTA el stick** (⚓, ancla) o **EMPUJA el stick** (tira), con un ✓ verde cuando lo estás haciendo bien.
+- **Sin parpadeos.** Las sombras siguen a la cámara ajustadas a la rejilla de su textura (antes «nadaban» y hacían titilar cintas, raíles y hierba), el plano cercano de la cámara es más preciso, las cintas y franjas de peligro se dibujan por encima del suelo y los bloques que se solapan comparten las mismas coordenadas de textura en sus caras superiores.
+
+## ¡A jugar en serio (y en broma)!
 
 - **Sincronía.** Todo lo que hacéis *juntos* suelta chispas con una onomatopeya de cómic y puntos: rebotar en la cabeza del otro (¡BOING!), coger su mano en el aire (¡TE TENGO!), subirlo (¡ARRIBA!), saltos conjuntos (¡HOP!, y ¡PERFECTO! si pulsáis casi a la vez), anillos, tirachinas, choques de manos, tuercas, goles, golpes al cangrejo y puntos de control. Si encadenáis jugadas en menos de 6 s sube un **multiplicador compartido ×2…×5** con su barra de cadena y un acorde que sube de tono. Al terminar, la tarjeta final estampa un **rango S/A/B/C**.
 - **¡Choca esos cinco!** Levanta la mano (gesto 1: tecla 1 / cruceta ↑ / 🖐️) y tu compañero te la choca con *Pegar*, o levantadla los dos estando cerca. Ámbar-bot te ofrece la mano después de los grandes momentos del tutorial, celebra cada paso que superas y te devuelve el gesto si se lo pides.
@@ -32,7 +42,7 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
   5. **Pasamanos de grúas** (unidos): un balancín físico, anillos alternos con brazos telescópicos de 8 m y un tirachinas de 6 m: se tensa manteniendo *Acción* y se dispara soltando los dos dentro de 350 ms.
   6. **Cangrejo clasificador** (clímax con las dos formas):
      - **A:** cada mini engancha un pestillo y lo arrastra a la cinta, esquivando barridos avisados con 1 s de antelación. Un puñetazo en el visor mientras levanta una pinza le hace perder el ritmo y cancela el barrido.
-     - **B:** unidos, agarran las asas; uno ancla (deja su stick quieto) mientras el otro tira, y luego intercambian los papeles para extraer el fusible.
+     - **B:** unidos, agarran las asas; uno ancla (suelta su stick) mientras el otro tira (empuja el suyo), y luego intercambian los papeles para extraer el fusible. Un indicador sobre cada asa dice a cada uno qué hacer.
      - **C:** esquivan el barrido bajo con un salto conjunto y llevan el fusible a la toma.
 - **Obstáculos móviles con física** en el nivel 1, todos con aviso legible y sin muerte instantánea (empujan y aturden):
   - **Barredoras:** brazos acolchados que giran sobre un eje con baliza. Un anillo de peligro en el suelo marca el área barrida; hay que saltar el brazo a tiempo. Hay una de calentamiento en la Escuela de guantes y otra de dos brazos en el patio tras las cintas.
@@ -46,7 +56,7 @@ Muestra vertical (*vertical slice*) del documento de diseño [`docs/GDD.md`](doc
   - Robots procedurales fieles al concept, con visor de ojos expresivos, antenas con muelle, squash and stretch y gestos.
   - Partículas con three.quarks y postprocesado: AO, bloom, ACES y viñeta.
   - Audio 100 % sintetizado y música adaptativa por capas.
-  - HUD contextual que muestra las teclas o botones del dispositivo que estés usando, flecha hacia el compañero, medallas y estadísticas.
+  - HUD mínimo: lo usable se ilumina con el color de su botón y solo se muestra ese botón (con las teclas o botones del dispositivo que estés usando); los textos se pliegan en el botón ⓘ. Flecha hacia el compañero, medallas y estadísticas.
 - **Accesibilidad:** modo ayuda (ventanas de 450 ms y agarres más anchos), reducción de sacudidas y destellos, agarre alterno, inversión del eje Y y sensibilidad. La identidad de cada robot no depende solo del color: Cian lleva planeta y antenas redondas, y Ámbar estrella y antenas cónicas.
 
 ## Cómo jugar
@@ -67,12 +77,13 @@ Cuatro botones de acción, colocados como en el mando de GameCube: **Saltar** gr
 | Mando | Teclado / ratón | Mini robot | Cuerpo unido |
 |---|---|---|---|
 | Stick izq. | WASD | Moverse | Dirigir **tu** pierna |
-| Stick der. | Ratón | Cámara | Apuntar **tu** brazo |
+| Stick der. | Ratón | Cámara | Cámara (cada jugador la suya); **tu** brazo apunta hacia donde miras |
 | **A** · Saltar (verde) | Espacio | Saltar (mantén = más alto). Al caer sobre la cabeza del compañero rebotas como en un trampolín | Impulso de tu pierna (dos a la vez = salto conjunto) |
-| **B** / LT · Agarrar (azul) | E / Shift | Mantén para **ofrecer la mano** y subir a tu compañero. Coge su mano en el aire, coge cajas. En el aire contra un muro, **te agarras a él** (salta para impulsarte). Junto a tu compañero, **lo agarras y lo arrastras** | Agarrar asas con tu mano |
+| **B** / LT · Agarrar (azul) | E / Shift | Mantén para **ofrecer la mano** y subir a tu compañero. Coge su mano en el aire, coge cajas. En el aire contra un muro, **te agarras a él** (salta para impulsarte). Junto a tu compañero, **lo agarras con las dos manos y lo arrastras** (se suelta si salta o te pega) | Agarrar asas con tu mano |
 | **X** · Pegar (rojo) | Clic izq. / F | **Pegar**: empuja a tu compañero, golpea al cangrejo, toca campanas y activa botones. Con caja, la lanza | Golpe de brazo: campanas, botones, enemigos |
 | **Y** / RT · Acción (violeta) | Clic der. / Q / R | **Contextual**: con un anillo iluminado, mantén para engancharte y recoger (cargado = muelle; un toque = tirón). En una placa, mantén para acoplaros | Con un anillo iluminado: lanzar tu brazo y tensar (tirachinas = soltad a la vez). Sin anillo: mantén para separaros |
 | RB | G | Señalar un punto | Señalar |
+| — | I | Releer el objetivo (botón ⓘ) | |
 | Cruceta | 1-4 | Gestos (↑ / 1 = mano arriba: ¡choca esos cinco!) | Gestos |
 | — | V / M | Pulsar para hablar / silenciar | |
 
@@ -81,7 +92,7 @@ Cuatro botones de acción, colocados como en el mando de GameCube: **Saltar** gr
 Se juega en horizontal. Al primer toque el juego pasa a pantalla completa y bloquea la orientación cuando el navegador lo permite.
 
 - **Pulgar izquierdo:** stick flotante. Aparece donde apoyas el dedo y se arrastra contigo si te pasas del borde, así que nunca hay que volver al centro.
-- **Pulgar derecho:** arrastra en cualquier zona libre para mover la cámara. Unidos, ese arrastre apunta tu brazo.
+- **Pulgar derecho:** arrastra en cualquier zona libre para mover la cámara. Unidos también: tu brazo apunta hacia donde miras.
 - **Botones al estilo GameCube:** *Saltar* grande en la esquina y, alrededor, tres botones redondos: *Pegar* a la izquierda (donde iría la B), *Agarrar* arriba a la izquierda y *Acción* arriba. Al deslizar el dedo de un botón a otro, la pulsación pasa al nuevo botón: de *Saltar* a *Agarrar* para coger la mano en el aire. Si lo deslizas fuera de los botones, el botón sigue pulsado y además mueves la cámara.
 - Los botones que pide el juego parpadean, y los textos de objetivo muestran los iconos de pantalla.
 - Hay vibración háptica. En *Ajustes → Pantalla táctil* se cambian la sensibilidad, el tamaño de los botones y la vibración.

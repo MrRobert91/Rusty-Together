@@ -18,6 +18,7 @@ const EMOTE_ICON = ['', '🖐️', '🎉', '👉', '❓']
 
 export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vector3; yaw: number }) {
   const wallHands = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], [])
+  const towFrom = useMemo(() => new THREE.Vector3(), [])
   const body = useRef<RapierRigidBody>(null)
   const view = useMemo(() => makeView(), [])
   const owned = mini.kind !== 'remote'
@@ -80,11 +81,23 @@ export function MiniRobot({ mini, spawn, yaw }: { mini: Mini; spawn: THREE.Vecto
       }
       view.handTargets[0] = wallHands[0]
       view.handTargets[1] = c.state !== 'idle' ? c.tip : wallHands[1]
+    } else if (mini.towing && !partner.hidden) {
+      // Both hands on the partner's body, on the side facing us (their «shoulders»).
+      const pp = partner.view?.rootWorld && partner.view.rootWorld.lengthSq() > 0 ? towFrom.copy(partner.view.rootWorld).setY(partner.view.rootWorld.y + MINI.feet) : towFrom.copy(partner.pos)
+      const dx = mini.pos.x - pp.x, dz = mini.pos.z - pp.z
+      const d = Math.max(Math.hypot(dx, dz), 1e-3)
+      const nx = dx / d, nz = dz / d
+      for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? -0.17 : 0.17
+        wallHands[i].set(pp.x + nx * 0.27 + nz * side, pp.y + 0.12, pp.z + nz * 0.27 - nx * side)
+      }
+      view.handTargets[0] = wallHands[0]
+      view.handTargets[1] = c.state !== 'idle' ? c.tip : wallHands[1]
     } else {
-      const towHand = mini.towing ? wallHands[0].set(partner.pos.x, partner.pos.y + 0.25, partner.pos.z) : null
-      view.handTargets[1] = c.state !== 'idle' ? c.tip : mini.offering ? mini.glove : mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : towHand
+      view.handTargets[1] = c.state !== 'idle' ? c.tip : mini.offering ? mini.glove : mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : null
       view.handTargets[0] = mini.hangOn >= 0 ? G.minis[mini.hangOn].glove : null
     }
+    view.reach = mini.towing || mini.hangOn >= 0 || mini.cling
     view.lookAt = c.state !== 'idle' ? c.tip : partner.hidden ? null : partner.pos.distanceTo(mini.pos) < 8 ? partner.pos : null
 
     // Footsteps derived from motion (works for local and replicated robots).

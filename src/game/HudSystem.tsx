@@ -4,7 +4,8 @@ import { useRapier } from '@react-three/rapier'
 import * as THREE from 'three'
 import type { World } from '@dimforge/rapier3d-compat'
 import { G, localMini, localSlot, onFx, peerMini, plateUnder } from './runtime'
-import { commitPrompts, prompt, toast, useHud } from './hud'
+import { commitPrompts, prompt, showInfo, toast, useHud } from './hud'
+import { signNear } from './signs'
 import { canTow, nearestBox, pickMiniTarget, pickPunchTarget } from './robots/miniController'
 import { pickBigPunch, pickBigTarget, shoulderPos } from './robots/bigController'
 import { BIG, BTN_COLOR, MINI, SLOT_NAME } from './tuning'
@@ -19,7 +20,7 @@ const tmp = new THREE.Vector3()
 
 /** Where each button would act this frame (drawn as a glowing marker in its colour). */
 type Mark = { on: boolean; pos: THREE.Vector3; flat: number }
-const marks: Record<'context' | 'grab' | 'punch', Mark> = {
+export const marks: Record<'context' | 'grab' | 'punch', Mark> = {
   context: { on: false, pos: new THREE.Vector3(), flat: 0 },
   grab: { on: false, pos: new THREE.Vector3(), flat: 0 },
   punch: { on: false, pos: new THREE.Vector3(), flat: 0 },
@@ -74,8 +75,8 @@ export function HudSystem() {
         prompt({ id: 'drop', btn: 'grab', text: 'Soltar caja' })
         prompt({ id: 'throw', btn: 'punch', text: 'Lanzar caja' })
       } else if (me.towing) {
+        // The hands on their body already show it: just the button to keep held.
         prompt({ id: 'tow', btn: 'grab', hold: true, text: `Arrastrando a ${pn}` })
-        mark('grab', partner.pos)
       } else if (c.state === 'attached' && !c.punch) {
         if (c.charge > 0.05) prompt({ id: 'launch', btn: 'context', text: c.charge >= 1 ? '¡Suelta para salir disparado!' : 'Cargando muelle… suelta para saltar', progress: c.charge })
         else prompt({ id: 'reel', btn: 'context', text: 'Recogiendo… suelta para soltarte' })
@@ -132,7 +133,7 @@ export function HudSystem() {
         if (me.offering) prompt({ id: 'offer', text: 'Ofreciendo la mano…' })
       }
       if (dragged) prompt({ id: 'dragged', text: `${pn} te lleva a rastras` })
-      if (G.vars.coupleWait === partner.slot) prompt({ id: 'partnerwants', text: `${pn} quiere acoplarse: id a la placa y mantened {context}` })
+      if (G.vars.coupleWait === partner.slot) prompt({ id: 'partnerwants', btn: 'context', hold: true, text: `${pn} quiere acoplarse: id a la placa y mantened {context}` })
     }
 
     if (G.form === 'joined' && G.big.active) {
@@ -153,6 +154,11 @@ export function HudSystem() {
     }
 
     if (me.dead && G.form === 'split') prompt({ id: 'respawn', text: 'Reapareciendo en el último refugio…' })
+
+    // Reading a sign: walk up to it and its text opens in the info bubble.
+    const reader = G.form === 'joined' ? G.big.pos : me.pos
+    const sg = me.dead ? null : signNear(reader, G.form === 'joined' ? 4.2 : 3.0, G.cam.fwd)
+    if (sg) showInfo(sg.sub ? `${sg.text}: ${sg.sub}` : sg.text, 'sign', { key: `sign${sg.id}`, weak: true })
 
     // HUD pilot indicators.
     const B = G.big
@@ -176,6 +182,7 @@ export function HudSystem() {
  */
 function TargetMarkers() {
   const refs = { context: useRef<THREE.Group>(null!), grab: useRef<THREE.Group>(null!), punch: useRef<THREE.Group>(null!) }
+  const halos = { context: useRef<THREE.Sprite>(null!), grab: useRef<THREE.Sprite>(null!), punch: useRef<THREE.Sprite>(null!) }
   const q = new THREE.Quaternion()
   const flatQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2)
   useFrame(({ camera }) => {
@@ -184,16 +191,26 @@ function TargetMarkers() {
       const g = refs[k].current
       const mk = marks[k]
       g.visible = mk.on
+      halos[k].current.visible = false
       if (!mk.on) continue
       g.position.copy(mk.pos)
       const pulse = 1 + Math.sin(t * 9) * 0.08
       if (mk.flat > 0) { g.quaternion.copy(flatQ); g.scale.setScalar(mk.flat * pulse) }
       else { g.quaternion.copy(q.copy(camera.quaternion)); g.scale.setScalar((k === 'context' ? 0.62 : 0.5) * pulse) }
       g.children[1].rotation.z = t * (k === 'grab' ? -2 : 2.5)
+      // Soft glow: the target itself lights up in the button's colour.
+      const h = halos[k].current
+      h.visible = true
+      h.position.copy(mk.pos)
+      h.scale.setScalar((mk.flat > 0 ? mk.flat * 2.2 : 1.9) * (1 + Math.sin(t * 6) * 0.1))
+      ;(h.material as THREE.SpriteMaterial).opacity = 0.55 + Math.sin(t * 6) * 0.15
     }
   })
   return (
     <>
+      {(['context', 'grab', 'punch'] as const).map((k) => (
+        <sprite key={'h' + k} ref={halos[k]} visible={false} renderOrder={9} material={haloMat(k)} />
+      ))}
       {(['context', 'grab', 'punch'] as const).map((k) => (
         <group key={k} ref={refs[k]} visible={false} renderOrder={10}>
           <mesh geometry={GEO.ringFlat()} material={markMat(k, 0.95)} />
@@ -206,6 +223,29 @@ function TargetMarkers() {
       ))}
     </>
   )
+}
+
+let haloTex: THREE.Texture | null = null
+const haloMats = new Map<string, THREE.SpriteMaterial>()
+/** Additive radial glow in a button colour (the «lit up» look of a target). */
+function haloMat(k: 'context' | 'grab' | 'punch') {
+  let m = haloMats.get(k)
+  if (m) return m
+  if (!haloTex) {
+    const c = document.createElement('canvas')
+    c.width = c.height = 128
+    const g = c.getContext('2d')!
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+    gr.addColorStop(0, 'rgba(255,255,255,1)')
+    gr.addColorStop(0.35, 'rgba(255,255,255,0.55)')
+    gr.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = gr
+    g.fillRect(0, 0, 128, 128)
+    haloTex = new THREE.CanvasTexture(c)
+  }
+  m = new THREE.SpriteMaterial({ map: haloTex, color: BTN_COLOR[k], transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })
+  haloMats.set(k, m)
+  return m
 }
 
 const markMats = new Map<string, THREE.Material>()

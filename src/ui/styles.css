@@ -166,7 +166,7 @@ table.controls td { padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07
 .room-mode { display: inline-block; margin-top: 8px; font-size: 14px; padding: 3px 12px; border-radius: 999px; background: rgba(16, 24, 38, 0.7); }
 @keyframes roomIn { 0% { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } 10%, 82% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
 
-.objective { position: absolute; top: 18px; right: 18px; max-width: 360px; background: var(--panel); border: 1px solid var(--panel-edge); padding: 10px 14px; border-radius: 14px; font-size: 15px; font-weight: 500; animation: panelIn 0.4s both; }
+.objective { position: absolute; top: 18px; right: 70px; max-width: 360px; background: var(--panel); border: 1px solid var(--panel-edge); padding: 10px 14px; border-radius: 14px; font-size: 15px; font-weight: 500; animation: panelIn 0.4s both; }
 .objective span { color: var(--amber); }
 
 .banner { position: absolute; top: 36%; left: 50%; transform: translateX(-50%); text-align: center; animation: bannerIn 2.6s both; }
@@ -375,3 +375,33 @@ table.controls td { padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07
 .dev-touch .sync-row { justify-content: flex-start; }
 @media (max-height: 520px) { .sync-meter, .dev-touch .sync-meter { top: calc(var(--sat) + 150px); transform: scale(0.8); transform-origin: left top; } .sync-meter.hit { animation: none; } }
 @keyframes syncHitL { 0% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+/* ---- Info button (top right): messages fold away after 4 s ---- */
+.info-wrap { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 5; }
+.info-btn { pointer-events: auto; width: 38px; height: 38px; flex: none; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(16, 24, 38, 0.45); color: #fff; font: 700 italic 20px/1 Georgia, 'Times New Roman', serif; cursor: pointer; display: grid; place-items: center; opacity: 0.75; transition: opacity 0.2s, transform 0.2s, background 0.2s; }
+.info-btn:hover, .info-btn.open { opacity: 1; background: rgba(16, 24, 38, 0.7); }
+.info-btn.open { transform: scale(1.06); }
+.info-bubble { max-width: min(360px, 52vw); background: rgba(16, 24, 38, 0.62); border: 1px solid rgba(255, 255, 255, 0.14); border-left: 4px solid var(--amber); padding: 8px 12px; border-radius: 12px; font-size: 15px; font-weight: 500; line-height: 1.35; backdrop-filter: blur(6px); animation: infoIn 0.25s cubic-bezier(.2, 1.4, .4, 1) both; }
+.info-bubble.sign { border-left-color: #ffc21a; }
+.info-bubble.good { border-left-color: var(--good); }
+.info-bubble.warn { border-left-color: var(--warn); }
+.info-bubble.cyan { border-left-color: var(--cyan); }
+.info-bubble.amber, .info-bubble.talk { border-left-color: var(--amber); }
+.info-bubble .info-icon { margin-right: 6px; }
+@keyframes infoIn { from { transform: translateX(16px); opacity: 0; } }
+
+/* ---- Button hints: only the glyph, semi-transparent ---- */
+.btn-hints { position: absolute; bottom: 7%; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.btn-hint { opacity: 0.62; }
+.btn-hint.on-target { position: absolute; transform: translate(-50%, -100%); opacity: 0.72; animation: hintBob 1.1s ease-in-out infinite; }
+@keyframes hintBob { 50% { margin-top: -4px; } }
+.hint-glyph { position: relative; display: inline-grid; place-items: center; padding: 4px; border-radius: 50%; }
+.hint-glyph .key { box-shadow: 0 0 12px var(--bc); }
+.hint-glyph.hold { background: conic-gradient(var(--bc) var(--prog), rgba(255, 255, 255, 0.22) 0); }
+.hint-glyph.hold::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, 0.5); pointer-events: none; }
+.dev-touch .info-wrap { right: 230px; top: calc(10px + var(--sat)); }
+.dev-touch .btn-hints { bottom: auto; top: 58%; }
+@media (max-height: 520px) {
+  .info-bubble { font-size: 13px; padding: 6px 10px; max-width: 280px; }
+  .info-btn { width: 32px; height: 32px; font-size: 17px; }
+}
